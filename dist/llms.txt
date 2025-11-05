@@ -1,0 +1,17 @@
+# EVVM
+
+> EVVM (Ethereum Virtual Machine for Verifiable Computation) enables virtual blockchains to operate on top of host blockchains without infrastructure overhead.
+
+## Docs
+- [Introduction](https://www.evvm.info/docs/intro): Overview of EVVM virtual blockchain architecture and core concepts
+- [QuickStart](https://www.evvm.info/docs/QuickStart): Get started with EVVM library or deploy your own instance
+- [EVVM Core Contract](https://www.evvm.info/docs/category/evvm-core-contract): Payment processing, token management, and administrative features
+- [Staking Service](https://www.evvm.info/docs/category/staking-service): Reward distribution, epoch management, and staking functions
+- [Name Service](https://www.evvm.info/docs/category/name-service): Username registration and identity management
+- [Treasury System](https://www.evvm.info/docs/category/treasury-system): Asset management and cross-chain transfers
+
+## Reference
+- [EIP-191: Signed Data Standard](https://eips.ethereum.org/EIPS/eip-191): Ethereum signature standard used for all EVVM transactions
+
+## Context files
+- [Full documentation](https://www.evvm.info/llms-full.txt): Complete concatenation of all documentation pages with logical ordering for LLM context

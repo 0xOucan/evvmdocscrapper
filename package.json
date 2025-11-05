@@ -1,0 +1,28 @@
+{
+  "name": "scrapper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "scrape": "tsx src/build-llms-full.ts",
+    "add-eip191": "tsx src/add-eip191.ts",
+    "build": "tsc",
+    "start": "node dist/build-llms-full.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "description": "",
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "crawlee": "^3.15.2",
+    "turndown": "^7.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/turndown": "^5.0.6",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

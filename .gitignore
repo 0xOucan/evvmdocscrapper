@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/*.js
+dist/*.d.ts
+dist/*.map
+
+# Crawlee storage (temporary scraping data)
+storage/
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Claude Code
+.claude/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+test/
+
+# Environment variables (if added in future)
+.env
+.env.local
+.env.*.local
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Keep dist output files (llms.txt and llms-full.txt)
+!dist/llms.txt
+!dist/llms-full.txt
