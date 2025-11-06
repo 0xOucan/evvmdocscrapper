@@ -1,4 +1,4 @@
-<!-- Scraper Metadata: {"timestamp":"2025-11-05T00:36:33.220Z","pageCount":136,"pagesHash":"e3b0c44298fc1c14","eip191Included":true,"version":"2.0.0"} -->
+<!-- Scraper Metadata: {"timestamp":"2025-11-06T22:43:07.595Z","pageCount":149,"pagesHash":"ea6c7b391bb1fbb2","eip191Included":true,"version":"2.0.0"} -->
 # EVVM Documentation
 
 Complete documentation for EVVM (Ethereum Virtual Machine for Verifiable Computation). This file contains all documentation pages from https://www.evvm.info/docs/ concatenated for LLM context.
@@ -832,9 +832,159 @@ The result is a virtual blockchain that operates efficiently while maintaining e
 *   [Economic Model Summary](#economic-model-summary)
 
 ## ERC-191: Signed Data Standard
-[Permalink for this section]()
+[Permalink for this section](https://eips.ethereum.org/EIPS/eip-191)
 
+Authors
 
+Martin Holst Swende ([@holiman](https://github.com/holiman)), Nick Johnson <[arachnid@notdot.net](mailto:arachnid@notdot.net)\>
+
+Created
+
+2016-01-20
+
+## Table of Contents
+
+*   [Abstract](#abstract)
+*   [Motivation](#motivation)
+    *   [Specification](#specification)
+        *   [Registry of version bytes](#registry-of-version-bytes)
+        *   [Example](#example)
+    *   [Copyright](#copyright)
+
+*   [Specification](#specification)
+    *   [Registry of version bytes](#registry-of-version-bytes)
+    *   [Example](#example)
+*   [Copyright](#copyright)
+
+# Abstract
+
+This ERC proposes a specification about how to handle signed data in Ethereum contracts.
+
+# Motivation
+
+Several multisignature wallet implementations have been created which accepts presigned transactions. A presigned transaction is a chunk of binary signed_data, along with signature (r, s and v). The interpretation of the signed_data has not been specified, leading to several problems:
+
+*   Standard Ethereum transactions can be submitted as `signed_data`. An Ethereum transaction can be unpacked, into the following components: `RLP<nonce, gasPrice, startGas, to, value, data>` (hereby called `RLPdata`), `r`, `s` and `v`. If there are no syntactical constraints on `signed_data`, this means that `RLPdata` can be used as a syntactically valid `presigned` transaction.
+*   Multisignature wallets have also had the problem that a `presigned` transaction has not been tied to a particular `validator`, i.e a specific wallet. Example:
+    1.  Users `A`, `B` and `C` have the `2/3`\-wallet `X`
+    2.  Users `A`, `B` and `D` have the `2/3`\-wallet `Y`
+    3.  User `A` and `B` submit `presigned` transactions to `X`.
+    4.  Attacker can now reuse their presigned transactions to `X`, and submit to `Y`.
+
+1.  Users `A`, `B` and `C` have the `2/3`\-wallet `X`
+2.  Users `A`, `B` and `D` have the `2/3`\-wallet `Y`
+3.  User `A` and `B` submit `presigned` transactions to `X`.
+4.  Attacker can now reuse their presigned transactions to `X`, and submit to `Y`.
+
+## Specification
+
+We propose the following format for signed_data
+
+```
+0x19 <1 byte version> <version specific data> <data to sign>.
+
+```
+
+The initial 0x19 byte is intended to ensure that the signed_data is not valid RLP.
+
+For a single byte whose value is in the [0x00, 0x7f] range, that byte is its own RLP encoding.
+
+That means that any signed_data cannot be one RLP-structure, but a 1-byte RLP payload followed by something else. Thus, any EIP-191 signed_data can never be an Ethereum transaction.
+
+Additionally, 0x19 has been chosen because since ethereum/go-ethereum#2940 , the following is prepended before hashing in personal_sign:
+
+```
+"\x19Ethereum Signed Message:\n" + len(message).
+
+```
+
+Using 0x19 thus makes it possible to extend the scheme by defining a version 0x45 (E) to handle these kinds of signatures.
+
+### Registry of version bytes
+
+Version byte
+
+EIP
+
+Description
+
+`0x00`
+
+[191](/EIPS/eip-191)
+
+Data with intended validator
+
+`0x01`
+
+[712](/EIPS/eip-712)
+
+Structured data
+
+`0x45`
+
+[191](/EIPS/eip-191)
+
+`personal_sign` messages
+
+#### Version 0x00
+
+```
+0x19 <0x00> <intended validator address> <data to sign>
+
+```
+
+The version 0x00 has <intended validator address> for the version specific data. In the case of a Multisig wallet that perform an execution based on a passed signature, the validator address is the address of the Multisig itself. The data to sign could be any arbitrary data.
+
+#### Version 0x01
+
+The version 0x01 is for structured data as defined in EIP-712
+
+#### Version 0x45 (E)
+
+```
+0x19 <0x45 (E)> <thereum Signed Message:\n" + len(message)> <data to sign>
+
+```
+
+The version 0x45 (E) has <thereum Signed Message:\n" + len(message)> for the version-specific data. The data to sign can be any arbitrary data.
+
+NB: The E in Ethereum Signed Message refers to the version byte 0x45. The character E is 0x45 in hexadecimal which makes the remainder, thereum Signed Message:\n + len(message), the version-specific data.
+
+### Example
+
+The following snippets has been written in Solidity 0.8.0.
+
+#### Version 0x00
+
+```
+function signatureBasedExecution(address target, uint256 nonce, bytes memory payload, uint8 v, bytes32 r, bytes32 s) public payable {
+        
+    // Arguments when calculating hash to validate
+    // 1: byte(0x19) - the initial 0x19 byte
+    // 2: byte(0) - the version byte
+    // 3: address(this) - the validator address
+    // 4-6 : Application specific data
+
+    bytes32 hash = keccak256(abi.encodePacked(byte(0x19), byte(0), address(this), msg.value, nonce, payload));
+
+    // recovering the signer from the hash and the signature
+    addressRecovered = ecrecover(hash, v, r, s);
+   
+    // logic of the wallet
+    // if (addressRecovered == owner) executeOnTarget(target, payload);
+}
+
+```
+
+## Copyright
+
+Copyright and related rights waived via CC0.
+
+## Citation
+
+Please cite this document as:
+
+Martin Holst Swende (@holiman), Nick Johnson <arachnid@notdot.net>, "ERC-191: Signed Data Standard," Ethereum Improvement Proposals, no. 191, January 2016. [Online serial]. Available: https://eips.ethereum.org/EIPS/eip-191.
 
 ## EVVM Core Contract
 [Permalink for this section](https://www.evvm.info/docs/category/evvm-core-contract)
@@ -18959,3 +19109,2430 @@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING
 FROM THE USE OF THIS SOFTWARE.
+
+## Order Functions
+[Permalink for this section](https://www.evvm.info/docs/category/order-functions)
+
+## makeOrder Function
+
+Detailed documentation of the P2P Swap Contract's order creation function for establishing token exchange orders.
+
+## cancelOrder Function
+
+Detailed documentation of the P2P Swap Contract's order cancellation function for removing orders and reclaiming tokens.
+
+## dispatchOrder_fillPropotionalFee Function
+
+Detailed documentation of the P2P Swap Contract's proportional fee order fulfillment function.
+
+## dispatchOrder_fillFixedFee Function
+
+Detailed documentation of the P2P Swap Contract's fixed fee order fulfillment function with fee caps.
+
+## P2P Swap Contract
+[Permalink for this section](https://www.evvm.info/docs/category/p2p-swap-contract)
+
+## Introduction to P2P Swap Contract
+
+Comprehensive overview of the P2P Swap Contract's decentralized token exchange functionality, order management, and fee structures.
+
+## Order Functions
+
+Core order management functions for creating, canceling, and fulfilling swap orders
+
+## Getter Functions
+
+Comprehensive documentation of P2P Swap Contract's query and information retrieval functions.
+
+## Administrative Functions
+
+Comprehensive documentation of P2P Swap Contract's administrative and governance functions.
+
+## P2P Swap Signatures
+[Permalink for this section](https://www.evvm.info/docs/category/p2p-swap-signatures)
+
+## Make Order Signature Structure
+
+To authorize order creation operations, users must generate a cryptographic signature compliant with the EIP-191 standard using the Ethereum Signed Message format.
+
+## Cancel Order Signature Structure
+
+To authorize order cancellation operations, users must generate a cryptographic signature compliant with the EIP-191 standard using the Ethereum Signed Message format.
+
+## Dispatch Order Signature Structure
+
+To authorize order fulfillment operations, users must generate a cryptographic signature compliant with the EIP-191 standard using the Ethereum Signed Message format.
+
+## Signature Structures
+[Permalink for this section](https://www.evvm.info/docs/category/signature-structures-1)
+
+Comprehensive documentation of EIP-191 signature structures used across all EVVM services for cryptographic transaction authorization. These specifications define how users must sign transactions for EVVM Core payments, Name Service operations, Staking functions, and cross-service interactions, ensuring security through replay protection, message integrity, and user authentication in the decentralized fisher-based validation system.
+
+## P2P Swap Signatures
+
+Signature structures for P2P Swap contract operations
+
+## Administrative Functions
+[Permalink for this section](https://www.evvm.info/docs/P2PSwap/AdminFunctions)
+
+The P2P Swap Contract implements a comprehensive administrative system with time-delayed governance, secure owner management, and flexible configuration options. All administrative changes follow a proposal-acceptance pattern with mandatory waiting periods for security.
+
+## Owner Management​
+
+### proposeOwner​
+
+Function Signature: proposeOwner(address _owner)
+
+Proposes a new contract owner with a 1-day acceptance window.
+
+Access: Current owner only
+Parameters:
+
+*   `_owner` (address): Address of the proposed new owner
+
+Process:
+
+1.  Sets `owner_proposal` to the new address
+2.  Sets `owner_timeToAccept` to `block.timestamp + 1 days`
+3.  Proposed owner has 24 hours to accept
+
+### acceptOwner​
+
+Function Signature: acceptOwner()
+
+Accepts the owner proposal and transfers ownership.
+
+Access: Proposed owner only, within acceptance window
+Requirements:
+
+*   Must be called by the proposed owner
+*   Must be within the 1-day acceptance window
+
+Process:
+
+1.  Transfers ownership to the proposed owner
+2.  Clears the proposal state
+
+### rejectProposeOwner​
+
+Function Signature: rejectProposeOwner()
+
+Rejects the owner proposal.
+
+Access: Proposed owner only, within acceptance window
+Process:
+
+1.  Clears the owner proposal
+2.  Cancels the ownership transfer
+
+## Fee Configuration Management​
+
+### Proportional Fee Management​
+
+#### proposeFillPropotionalPercentage​
+
+Function Signature: proposeFillPropotionalPercentage(uint256 _seller, uint256 _service, uint256 _mateStaker)
+
+Proposes new fee distribution percentages for proportional fee model.
+
+Access: Owner only
+Parameters:
+
+*   `_seller` (uint256): Percentage for sellers (basis points)
+*   `_service` (uint256): Percentage for service treasury (basis points)
+*   `_mateStaker` (uint256): Percentage for MATE stakers (basis points)
+
+Requirements:
+
+*   Total must equal 10,000 (100%)
+*   1-day waiting period before acceptance
+
+#### acceptFillPropotionalPercentage​
+
+Function Signature: acceptFillPropotionalPercentage()
+
+Accepts the proposed proportional fee distribution.
+
+Access: Owner only, within acceptance window
+
+#### rejectProposeFillPropotionalPercentage​
+
+Function Signature: rejectProposeFillPropotionalPercentage()
+
+Rejects the proposed proportional fee distribution.
+
+Access: Owner only, within acceptance window
+
+### Fixed Fee Management​
+
+#### proposeFillFixedPercentage​
+
+Function Signature: proposeFillFixedPercentage(uint256 _seller, uint256 _service, uint256 _mateStaker)
+
+Proposes new fee distribution percentages for fixed fee model.
+
+Access: Owner only
+Parameters: Same as proportional fee management
+Requirements: Same validation rules apply
+
+#### acceptFillFixedPercentage / rejectProposeFillFixedPercentage​
+
+Similar pattern to proportional fee management functions.
+
+### Base Fee Rate Management​
+
+#### proposePercentageFee​
+
+Function Signature: proposePercentageFee(uint256 _percentageFee)
+
+Proposes a new base percentage fee rate.
+
+Access: Owner only
+Parameters:
+
+*   `_percentageFee` (uint256): New fee percentage in basis points (e.g., 500 = 5%)
+
+#### acceptPercentageFee / rejectProposePercentageFee​
+
+Standard proposal-acceptance pattern with 1-day delay.
+
+### Fixed Fee Limit Management​
+
+#### proposeMaxLimitFillFixedFee​
+
+Function Signature: proposeMaxLimitFillFixedFee(uint256 _maxLimitFillFixedFee)
+
+Proposes a new maximum limit for fixed fees.
+
+Access: Owner only
+Parameters:
+
+*   `_maxLimitFillFixedFee` (uint256): New maximum fee limit in token units
+
+#### acceptMaxLimitFillFixedFee / rejectProposeMaxLimitFillFixedFee​
+
+Standard proposal-acceptance pattern with 1-day delay.
+
+## Treasury Management​
+
+### proposeWithdrawal​
+
+Function Signature: proposeWithdrawal(address _tokenToWithdraw, uint256 _amountToWithdraw, address _to)
+
+Proposes withdrawal of accumulated fees from the contract treasury.
+
+Access: Owner only
+Parameters:
+
+*   `_tokenToWithdraw` (address): Token to withdraw
+*   `_amountToWithdraw` (uint256): Amount to withdraw
+*   `_to` (address): Recipient address
+
+Requirements:
+
+*   Amount must not exceed contract balance for the token
+*   1-day waiting period before execution
+
+### acceptWithdrawal​
+
+Function Signature: acceptWithdrawal()
+
+Executes the proposed withdrawal.
+
+Access: Owner only, within acceptance window
+Process:
+
+1.  Transfers tokens to the specified recipient
+2.  Updates contract balance tracking
+3.  Clears withdrawal proposal state
+
+### rejectProposeWithdrawal​
+
+Function Signature: rejectProposeWithdrawal()
+
+Cancels the proposed withdrawal.
+
+Access: Owner only, within acceptance window
+
+## Staking Management​
+
+### stake​
+
+Function Signature: stake(uint256 amount)
+
+Stakes MATE tokens on behalf of the contract.
+
+Access: Owner only
+Parameters:
+
+*   `amount` (uint256): Number of staking tokens to purchase
+
+Requirements:
+
+*   Contract must have sufficient MATE token balance
+*   Uses current staking price from Staking contract
+
+Process:
+
+1.  Calculates required MATE tokens (amount × staking price)
+2.  Calls internal `_makeStakeService` function
+3.  Contract becomes a service staker
+
+### unstake​
+
+Function Signature: unstake(uint256 amount)
+
+Unstakes MATE tokens from the contract's staking position.
+
+Access: Owner only
+Parameters:
+
+*   `amount` (uint256): Number of staking tokens to unstake
+
+Process:
+
+1.  Calls internal `_makeUnstakeService` function
+2.  Follows standard unstaking procedures and timelock
+
+## Balance Management​
+
+### addBalance​
+
+Function Signature: addBalance(address _token, uint256 _amount)
+
+Manually adjusts contract balance tracking for a specific token.
+
+Access: Owner only
+Parameters:
+
+*   `_token` (address): Token address
+*   `_amount` (uint256): Amount to add to balance tracking
+
+Use Cases:
+
+*   Correcting balance discrepancies
+*   Accounting for direct token transfers
+*   Administrative balance adjustments
+
+## Security Features​
+
+### Time-Delayed Execution​
+
+All administrative changes follow a mandatory 1-day delay pattern:
+
+1.  **Proposal Phase**: Owner proposes changes
+2.  **Waiting Period**: 24-hour delay for transparency
+3.  **Execution Window**: Limited time to accept or reject
+4.  **Automatic Expiry**: Proposals expire if not acted upon
+
+### Access Control​
+
+*   **Owner-Only Functions**: Most administrative functions restricted to contract owner
+*   **Proposal-Specific Access**: Some functions require being the proposed party
+*   **Time Window Validation**: All time-sensitive functions validate execution windows
+
+### Validation Checks​
+
+*   **Balance Verification**: Withdrawal amounts validated against actual balances
+*   **Percentage Validation**: Fee percentages must sum to exactly 100%
+*   **Address Validation**: Non-zero address requirements where applicable
+
+## Administrative Workflow Examples​
+
+### Changing Fee Structure​
+
+```codeBlockLines_e6Vv
+// 1. Owner proposes new fee distribution (60% seller, 30% service, 10% stakers)p2pSwap.proposeFillPropotionalPercentage(6000, 3000, 1000);// 2. Wait 24 hours// 3. Owner accepts the changep2pSwap.acceptFillPropotionalPercentage();
+```
+
+### Treasury Withdrawal​
+
+```codeBlockLines_e6Vv
+// 1. Owner proposes withdrawal of 100 USDC to treasury addressp2pSwap.proposeWithdrawal(usdcAddress, 100000000, treasuryAddress);// 2. Wait 24 hours// 3. Owner executes withdrawalp2pSwap.acceptWithdrawal();
+```
+
+### Owner Transfer​
+
+```codeBlockLines_e6Vv
+// 1. Current owner proposes new ownerp2pSwap.proposeOwner(newOwnerAddress);// 2. New owner accepts within 24 hours// (called by newOwnerAddress)p2pSwap.acceptOwner();
+```
+
+## Emergency Procedures​
+
+### Proposal Cancellation​
+
+Any pending proposal can be cancelled by the appropriate party:
+
+*   Owner proposals: Can be rejected by proposed owner
+*   Administrative proposals: Can be rejected by current owner
+
+### Time Window Management​
+
+*   All proposals have exactly 24-hour acceptance windows
+*   Expired proposals must be re-proposed
+*   No emergency override mechanisms (by design)
+
+The administrative system balances operational flexibility with security through mandatory delays, ensuring all stakeholders have visibility into proposed changes before they take effect.
+
+*   [Owner Management](#owner-management)
+    *   [proposeOwner](#proposeowner)
+    *   [acceptOwner](#acceptowner)
+    *   [rejectProposeOwner](#rejectproposeowner)
+*   [Fee Configuration Management](#fee-configuration-management)
+    *   [Proportional Fee Management](#proportional-fee-management)
+    *   [Fixed Fee Management](#fixed-fee-management)
+    *   [Base Fee Rate Management](#base-fee-rate-management)
+    *   [Fixed Fee Limit Management](#fixed-fee-limit-management)
+*   [Treasury Management](#treasury-management)
+    *   [proposeWithdrawal](#proposewithdrawal)
+    *   [acceptWithdrawal](#acceptwithdrawal)
+    *   [rejectProposeWithdrawal](#rejectproposewithdrawal)
+*   [Staking Management](#staking-management)
+    *   [stake](#stake)
+    *   [unstake](#unstake)
+*   [Balance Management](#balance-management)
+    *   [addBalance](#addbalance)
+*   [Security Features](#security-features)
+    *   [Time-Delayed Execution](#time-delayed-execution)
+    *   [Access Control](#access-control)
+    *   [Validation Checks](#validation-checks)
+*   [Administrative Workflow Examples](#administrative-workflow-examples)
+    *   [Changing Fee Structure](#changing-fee-structure)
+    *   [Treasury Withdrawal](#treasury-withdrawal)
+    *   [Owner Transfer](#owner-transfer)
+*   [Emergency Procedures](#emergency-procedures)
+    *   [Proposal Cancellation](#proposal-cancellation)
+    *   [Time Window Management](#time-window-management)
+
+## Getter Functions
+[Permalink for this section](https://www.evvm.info/docs/P2PSwap/GetterFunctions)
+
+The P2P Swap Contract provides a comprehensive set of getter functions for querying order information, market data, user balances, and administrative settings. These functions enable users and applications to interact effectively with the marketplace.
+
+## Order Query Functions​
+
+### getAllMarketOrders​
+
+Function Signature: getAllMarketOrders(uint256 market) → OrderForGetter[]
+
+Returns all orders in a specific market, including both active and cancelled orders.
+
+Parameters:
+
+*   `market` (uint256): The market ID to query
+
+Returns:
+
+*   Array of `OrderForGetter` structs containing market ID, order ID, seller, and amounts
+
+Usage Example:
+
+```codeBlockLines_e6Vv
+// Get all orders in USDC/ETH market (market ID 1)OrderForGetter[] memory orders = p2pSwap.getAllMarketOrders(1);
+```
+
+### getOrder​
+
+Function Signature: getOrder(uint256 market, uint256 orderId) → Order
+
+Retrieves a specific order by market and order ID.
+
+Parameters:
+
+*   `market` (uint256): The market ID
+*   `orderId` (uint256): The order ID within the market
+
+Returns:
+
+*   `Order` struct containing seller address and token amounts
+
+### getMyOrdersInSpecificMarket​
+
+Function Signature: getMyOrdersInSpecificMarket(address user, uint256 market) → OrderForGetter[]
+
+Returns all orders created by a specific user in a given market.
+
+Parameters:
+
+*   `user` (address): The user's address
+*   `market` (uint256): The market ID to query
+
+Returns:
+
+*   Array of user's orders in the specified market
+
+## Market Information Functions​
+
+### findMarket​
+
+Function Signature: findMarket(address tokenA, address tokenB) → uint256
+
+Finds the market ID for a specific token pair.
+
+Parameters:
+
+*   `tokenA` (address): First token in the pair
+*   `tokenB` (address): Second token in the pair
+
+Returns:
+
+*   Market ID (0 if market doesn't exist)
+
+### getMarketMetadata​
+
+Function Signature: getMarketMetadata(uint256 market) → MarketInformation
+
+Retrieves complete metadata for a specific market.
+
+Parameters:
+
+*   `market` (uint256): The market ID
+
+Returns:
+
+*   `MarketInformation` struct containing token addresses, max slots, and available orders
+
+### getAllMarketsMetadata​
+
+Function Signature: getAllMarketsMetadata() → MarketInformation[]
+
+Returns metadata for all existing markets.
+
+Returns:
+
+*   Array of `MarketInformation` structs for all markets
+
+## User State Functions​
+
+### checkIfANonceP2PSwapIsUsed​
+
+Function Signature: checkIfANonceP2PSwapIsUsed(address user, uint256 nonce) → bool
+
+Checks if a specific nonce has been used by a user.
+
+Parameters:
+
+*   `user` (address): The user's address
+*   `nonce` (uint256): The nonce to check
+
+Returns:
+
+*   `true` if nonce has been used, `false` otherwise
+
+## Contract Balance Functions​
+
+### getBalanceOfContract​
+
+Function Signature: getBalanceOfContract(address token) → uint256
+
+Returns the contract's balance for a specific token.
+
+Parameters:
+
+*   `token` (address): The token address to query
+
+Returns:
+
+*   Token balance held by the contract
+
+## Administrative Query Functions​
+
+### Owner Management​
+
+#### getOwner​
+
+Function Signature: getOwner() → address
+Returns the current contract owner address.
+
+#### getOwnerProposal​
+
+Function Signature: getOwnerProposal() → address
+Returns the proposed new owner address.
+
+#### getOwnerTimeToAccept​
+
+Function Signature: getOwnerTimeToAccept() → uint256
+Returns the timestamp when the owner proposal expires.
+
+### Fee Configuration​
+
+#### getPercentageFee​
+
+Function Signature: getPercentageFee() → uint256
+Returns the current percentage fee (in basis points, e.g., 500 = 5%).
+
+#### getProposalPercentageFee​
+
+Function Signature: getProposalPercentageFee() → uint256
+Returns the proposed percentage fee.
+
+#### getRewardPercentage​
+
+Function Signature: getRewardPercentage() → Percentage
+Returns the current fee distribution percentages.
+
+#### getRewardPercentageProposal​
+
+Function Signature: getRewardPercentageProposal() → Percentage
+Returns the proposed fee distribution percentages.
+
+### Fixed Fee Limits​
+
+#### getMaxLimitFillFixedFee​
+
+Function Signature: getMaxLimitFillFixedFee() → uint256
+Returns the current maximum fixed fee limit.
+
+#### getMaxLimitFillFixedFeeProposal​
+
+Function Signature: getMaxLimitFillFixedFeeProposal() → uint256
+Returns the proposed maximum fixed fee limit.
+
+### Treasury Management​
+
+#### getProposedWithdrawal​
+
+Function Signature: getProposedWithdrawal() → (address, uint256, address, uint256)
+Returns details of any pending withdrawal proposal.
+
+Returns:
+
+*   `tokenToWithdraw` (address): Token to be withdrawn
+*   `amountToWithdraw` (uint256): Amount to be withdrawn
+*   `recipientToWithdraw` (address): Recipient of the withdrawal
+*   `timeToWithdrawal` (uint256): Expiration timestamp of the proposal
+
+## Data Structures​
+
+### OrderForGetter​
+
+```codeBlockLines_e6Vv
+struct OrderForGetter {    uint256 marketId;    uint256 orderId;    address seller;    uint256 amountA;    uint256 amountB;}
+```
+
+### Order​
+
+```codeBlockLines_e6Vv
+struct Order {    address seller;    uint256 amountA;    uint256 amountB;}
+```
+
+### MarketInformation​
+
+```codeBlockLines_e6Vv
+struct MarketInformation {    address tokenA;    address tokenB;    uint256 maxSlot;    uint256 ordersAvailable;}
+```
+
+### Percentage​
+
+```codeBlockLines_e6Vv
+struct Percentage {    uint256 seller;    uint256 service;    uint256 mateStaker;}
+```
+
+## Usage Examples​
+
+### Finding and Browsing Orders​
+
+```codeBlockLines_e6Vv
+// Find USDC/ETH marketuint256 marketId = p2pSwap.findMarket(usdcAddress, ethAddress);if (marketId != 0) {    // Get all orders in this market    OrderForGetter[] memory orders = p2pSwap.getAllMarketOrders(marketId);        // Check market statistics    MarketInformation memory marketInfo = p2pSwap.getMarketMetadata(marketId);        // Get specific order details    Order memory specificOrder = p2pSwap.getOrder(marketId, 1);}
+```
+
+### Checking User Activity​
+
+```codeBlockLines_e6Vv
+// Check if user has orders in a marketOrderForGetter[] memory userOrders = p2pSwap.getMyOrdersInSpecificMarket(    userAddress,     marketId);// Verify nonce hasn't been usedbool nonceUsed = p2pSwap.checkIfANonceP2PSwapIsUsed(userAddress, 42);
+```
+
+### Monitoring Contract State​
+
+```codeBlockLines_e6Vv
+// Check contract's token balancesuint256 ethBalance = p2pSwap.getBalanceOfContract(ethAddress);uint256 usdcBalance = p2pSwap.getBalanceOfContract(usdcAddress);// Get current fee configurationuint256 currentFee = p2pSwap.getPercentageFee();Percentage memory feeDistribution = p2pSwap.getRewardPercentage();
+```
+
+These getter functions provide complete visibility into the P2P Swap marketplace, enabling users, applications, and administrators to make informed decisions and monitor system state effectively.
+
+*   [Order Query Functions](#order-query-functions)
+    *   [getAllMarketOrders](#getallmarketorders)
+    *   [getOrder](#getorder)
+    *   [getMyOrdersInSpecificMarket](#getmyordersinspecificmarket)
+*   [Market Information Functions](#market-information-functions)
+    *   [findMarket](#findmarket)
+    *   [getMarketMetadata](#getmarketmetadata)
+    *   [getAllMarketsMetadata](#getallmarketsmetadata)
+*   [User State Functions](#user-state-functions)
+    *   [checkIfANonceP2PSwapIsUsed](#checkifanoncep2pswapisused)
+*   [Contract Balance Functions](#contract-balance-functions)
+    *   [getBalanceOfContract](#getbalanceofcontract)
+*   [Administrative Query Functions](#administrative-query-functions)
+    *   [Owner Management](#owner-management)
+    *   [Fee Configuration](#fee-configuration)
+    *   [Fixed Fee Limits](#fixed-fee-limits)
+    *   [Treasury Management](#treasury-management)
+*   [Data Structures](#data-structures)
+    *   [OrderForGetter](#orderforgetter)
+    *   [Order](#order)
+    *   [MarketInformation](#marketinformation)
+    *   [Percentage](#percentage)
+*   [Usage Examples](#usage-examples)
+    *   [Finding and Browsing Orders](#finding-and-browsing-orders)
+    *   [Checking User Activity](#checking-user-activity)
+    *   [Monitoring Contract State](#monitoring-contract-state)
+
+## Introduction to P2P Swap Contract
+[Permalink for this section](https://www.evvm.info/docs/P2PSwap/Introduction)
+
+The P2P Swap Contract is a decentralized peer-to-peer token exchange system that enables users to create, manage, and fulfill token swap orders in a trustless marketplace environment. Built on the EVVM ecosystem, it provides a comprehensive order book system with flexible fee structures and integrated staking rewards.
+
+## Core Contract Functions​
+
+### Order Management System​
+
+The P2P Swap Contract implements a sophisticated order book system:
+
+*   **Order Creation (`makeOrder`)**: Users can create swap orders offering one token in exchange for another
+*   **Order Cancellation (`cancelOrder`)**: Order creators can cancel their unfilled orders and reclaim their tokens
+*   **Order Fulfillment**: Two dispatch methods with different fee structures for order execution
+*   **Market Discovery**: Automatic market creation for new token pairs
+
+### Fee Structure Models​
+
+*   **Proportional Fee Model**: Percentage-based fees calculated from order amounts
+*   **Fixed Fee Model**: Capped fee structure with maximum limits to protect users
+*   **Dynamic Fee Distribution**: Fees distributed between sellers, service treasury, and MATE stakers
+
+### EVVM Ecosystem Integration​
+
+*   **Payment Processing**: Full integration with EVVM's payment system for secure token transfers
+*   **Staking Rewards**: Executors who are MATE stakers receive additional rewards
+*   **Signature Authorization**: EIP-191 signature verification for all operations
+*   **Service Staking**: Contract can stake MATE tokens to participate in the staking ecosystem
+
+## Market Architecture​
+
+### Dynamic Market Creation​
+
+*   **Automatic Markets**: New markets created automatically when users create orders for new token pairs
+*   **Market Identification**: Each token pair (tokenA/tokenB) gets a unique market ID
+*   **Order Storage**: Orders organized by market ID and sequential order IDs within each market
+*   **Efficient Lookup**: Fast market discovery and order retrieval through optimized mappings
+
+### Order Book Structure​
+
+*   **Sequential Order IDs**: Orders assigned sequential IDs within each market for easy tracking
+*   **Slot Management**: Efficient slot reuse when orders are cancelled or filled
+*   **Order Metadata**: Complete order information including seller, amounts, and status
+*   **Market Statistics**: Real-time tracking of available orders and market capacity
+
+## Economic Model​
+
+### Fee Distribution System​
+
+The contract implements a three-way fee split:
+
+*   **Seller Rewards**: Portion of fees goes to order creators as incentive
+*   **Service Treasury**: Contract accumulates fees for operational sustainability
+*   **MATE Staker Rewards**: Stakers who execute transactions receive fee portions
+
+### Staker Incentive Structure​
+
+*   **Base Rewards**: All staker executors receive MATE token rewards
+*   **Priority Fee Bonuses**: Additional rewards for processing priority transactions
+*   **Execution Multipliers**: Higher rewards for complex operations (3x-5x base rewards)
+*   **Fee Sharing**: Stakers receive portions of transaction fees as additional compensation
+
+### Treasury Management​
+
+*   **Fee Accumulation**: Service fees automatically accumulate in contract balances
+*   **Withdrawal System**: Time-delayed withdrawal proposals for treasury management
+*   **Balance Tracking**: Real-time tracking of contract token balances
+*   **Staking Integration**: Contract can stake accumulated MATE tokens for additional rewards
+
+## Security Architecture​
+
+### Signature-Based Authorization​
+
+All operations require cryptographic signatures using EIP-191 standard:
+
+*   **User Authorization**: Each action must be signed by the relevant user
+*   **Replay Protection**: Nonce-based system prevents transaction replay attacks
+*   **Parameter Integrity**: Signatures cover all critical transaction parameters
+*   **Message Verification**: Dedicated SignatureUtils library for consistent verification
+
+### Time-Delayed Governance​
+
+Administrative functions use time-delayed execution:
+
+*   **Proposal Period**: 1-day waiting period for all administrative changes
+*   **Transparency**: All changes visible before execution
+*   **Emergency Controls**: Proposals can be cancelled during waiting period
+*   **Owner Management**: Secure owner transfer process with proposal/acceptance pattern
+
+## Integration Capabilities​
+
+### EVVM Core Integration​
+
+*   **Payment Functions**: Direct integration with EVVM's `pay`, `caPay`, and `disperseCaPay` functions
+*   **Token Abstractions**: Works with EVVM's internal token representation system
+*   **Staker Detection**: Automatic detection of staker status for reward distribution
+*   **Priority Processing**: Support for priority fees and expedited transaction processing
+
+### Staking Service Integration​
+
+*   **Service Staking**: Contract can stake MATE tokens as a service participant
+*   **Reward Accumulation**: Automatic accumulation of staking rewards
+*   **Unstaking Process**: Controlled unstaking with proper authorization
+*   **Balance Management**: Integration with staking balance tracking
+
+## Execution Methods​
+
+The P2P Swap Contract supports multiple execution approaches:
+
+### Direct Execution​
+
+*   **User-Initiated**: Users interact directly with the P2P Swap contract
+*   **Immediate Processing**: Transactions submitted directly to the blockchain
+*   **Full Control**: Complete autonomy over transaction timing and parameters
+
+### Fisher Execution​
+
+*   **Fishing Spot Integration**: Users submit transactions through the fishing spot system
+*   **Fisher Processing**: Specialized fisher nodes capture and execute transactions
+*   **Staker Benefits**: Fisher executors who are stakers receive enhanced rewards
+*   **Optimized Routing**: Fishers handle transaction optimization and gas management
+
+## Order Lifecycle​
+
+### Order Creation Process​
+
+1.  **Signature Generation**: User signs order parameters with their private key
+2.  **Token Transfer**: User's tokens transferred to contract via EVVM payment system
+3.  **Market Assignment**: Order assigned to appropriate market (created if necessary)
+4.  **Order Storage**: Order details stored in contract with unique ID
+5.  **Reward Distribution**: Staker executors receive MATE token rewards
+
+### Order Fulfillment Process​
+
+1.  **Order Selection**: Buyer selects order from available market orders
+2.  **Signature Verification**: Buyer's signature verified for dispatch authorization
+3.  **Token Exchange**: Automatic token swap between buyer and seller
+4.  **Fee Processing**: Fees calculated and distributed to all parties
+5.  **Order Cleanup**: Completed order removed from active order book
+
+### Order Cancellation Process​
+
+1.  **Authorization Check**: Verify cancellation request from order creator
+2.  **Token Return**: Original tokens returned to order creator
+3.  **Order Removal**: Order removed from market order book
+4.  **Market Update**: Market statistics updated to reflect cancellation
+
+## Fee Calculation Models​
+
+### Proportional Fee Model​
+
+*   **Percentage-Based**: Fees calculated as percentage of order amount
+*   **Configurable Rate**: Admin-adjustable percentage rate (default 5%)
+*   **Predictable Costs**: Users know exact fee percentage in advance
+*   **Scalable Structure**: Fees scale proportionally with order size
+
+### Fixed Fee Model​
+
+*   **Capped Fees**: Maximum fee limit protects users from excessive charges
+*   **Hybrid Approach**: Uses proportional calculation up to maximum limit
+*   **User Protection**: Prevents fee exploitation on large orders
+*   **Flexible Implementation**: Supports both models simultaneously
+
+## Administrative Features​
+
+### Governance System​
+
+*   **Owner Management**: Secure owner transfer with time-delayed acceptance
+*   **Fee Configuration**: Adjustable fee percentages and distribution ratios
+*   **Treasury Operations**: Controlled withdrawal system for accumulated fees
+*   **Staking Management**: Contract-level staking operations for service participation
+
+### Monitoring and Analytics​
+
+*   **Order Tracking**: Complete order history and status monitoring
+*   **Market Analytics**: Real-time market statistics and order book depth
+*   **Fee Analytics**: Detailed fee collection and distribution tracking
+*   **Balance Monitoring**: Real-time contract balance tracking across all tokens
+
+The P2P Swap Contract provides a comprehensive decentralized exchange infrastructure that seamlessly integrates with the EVVM ecosystem while offering flexible fee structures, robust security, and attractive incentives for both users and stakers.
+
+*   [Core Contract Functions](#core-contract-functions)
+    *   [Order Management System](#order-management-system)
+    *   [Fee Structure Models](#fee-structure-models)
+    *   [EVVM Ecosystem Integration](#evvm-ecosystem-integration)
+*   [Market Architecture](#market-architecture)
+    *   [Dynamic Market Creation](#dynamic-market-creation)
+    *   [Order Book Structure](#order-book-structure)
+*   [Economic Model](#economic-model)
+    *   [Fee Distribution System](#fee-distribution-system)
+    *   [Staker Incentive Structure](#staker-incentive-structure)
+    *   [Treasury Management](#treasury-management)
+*   [Security Architecture](#security-architecture)
+    *   [Signature-Based Authorization](#signature-based-authorization)
+    *   [Time-Delayed Governance](#time-delayed-governance)
+*   [Integration Capabilities](#integration-capabilities)
+    *   [EVVM Core Integration](#evvm-core-integration)
+    *   [Staking Service Integration](#staking-service-integration)
+*   [Execution Methods](#execution-methods)
+    *   [Direct Execution](#direct-execution)
+    *   [Fisher Execution](#fisher-execution)
+*   [Order Lifecycle](#order-lifecycle)
+    *   [Order Creation Process](#order-creation-process)
+    *   [Order Fulfillment Process](#order-fulfillment-process)
+    *   [Order Cancellation Process](#order-cancellation-process)
+*   [Fee Calculation Models](#fee-calculation-models)
+    *   [Proportional Fee Model](#proportional-fee-model)
+    *   [Fixed Fee Model](#fixed-fee-model)
+*   [Administrative Features](#administrative-features)
+    *   [Governance System](#governance-system)
+    *   [Monitoring and Analytics](#monitoring-and-analytics)
+
+## cancelOrder Function
+[Permalink for this section](https://www.evvm.info/docs/P2PSwap/OrderFunctions/cancelOrder)
+
+Function Type: external
+Function Signature: cancelOrder(address,MetadataCancelOrder,uint256,uint256,bool,bytes)
+
+The cancelOrder function allows order creators to cancel their existing orders and reclaim their locked tokens. This function validates ownership, returns tokens to the original creator, and provides rewards to staker executors.
+
+Key features:
+
+*   **Order Cancellation**: Removes existing orders from the marketplace
+*   **Token Recovery**: Returns locked tokens to the original order creator
+*   **Ownership Validation**: Ensures only order creators can cancel their orders
+*   **Staker Rewards**: Executors who are stakers receive MATE token rewards
+*   **Market Cleanup**: Updates market statistics after order removal
+
+### Parameters​
+
+Field
+
+Type
+
+Description
+
+`user`
+
+`address`
+
+The address that created the original order and is requesting cancellation
+
+`metadata`
+
+`MetadataCancelOrder`
+
+Struct containing cancellation details and embedded signature
+
+`_priorityFee_Evvm`
+
+`uint256`
+
+Priority fee for EVVM transaction processing (optional)
+
+`_nonce_Evvm`
+
+`uint256`
+
+Nonce for EVVM payment transaction
+
+`_priority_Evvm`
+
+`bool`
+
+Priority flag for EVVM payment (sync/async)
+
+`_signature_Evvm`
+
+`bytes`
+
+EIP-191 signature for EVVM payment authorization
+
+_priorityFee_Evvm is paid using principal tokens
+
+### MetadataCancelOrder Structure​
+
+Field
+
+Type
+
+Description
+
+`nonce`
+
+`uint256`
+
+Unique nonce for P2P Swap replay protection
+
+`tokenA`
+
+`address`
+
+Token that was offered in the original order
+
+`tokenB`
+
+`address`
+
+Token that was requested in the original order
+
+`orderId`
+
+`uint256`
+
+ID of the order to be cancelled
+
+`signature`
+
+`bytes`
+
+EIP-191 signature from `user` authorizing the cancellation
+
+### Execution Methods​
+
+#### Fisher Execution​
+
+1.  User signs cancellation details and optional EVVM payment authorization
+2.  Fisher captures the transaction and validates all signatures
+3.  Fisher submits the transaction and receives staker rewards if eligible
+4.  Order is cancelled and tokens are returned to the user
+
+#### Direct Execution​
+
+1.  User or authorized service calls the function directly
+2.  All signature validations are performed on-chain
+3.  Order cancellation and token return happen immediately
+4.  Staker benefits are distributed if executor qualifies
+
+### Workflow​
+
+1.  **P2P Signature Verification**: Validates the embedded `metadata.signature` against the `user` address and cancellation parameters using `SignatureUtils.verifyMessageSignedForCancelOrder`. Reverts with `"Invalid signature"` on failure.
+    
+2.  **Market Resolution**: Finds the market for the token pair using `findMarket(metadata.tokenA, metadata.tokenB)`.
+    
+3.  **Nonce Validation**: Checks if the P2P nonce has been used before by consulting `nonceP2PSwap[user][metadata.nonce]`. Reverts with `"Invalid nonce"` if the nonce was previously used.
+    
+4.  **Order Ownership Verification**: Validates that:
+    
+    *   The market exists (market != 0)
+    *   The order exists and belongs to the requesting user
+    *   Reverts with `"Invalid order"` if validation fails
+5.  **Priority Fee Processing**: If `_priorityFee_Evvm > 0`, processes the priority fee payment using `makePay` with MATE tokens.
+    
+6.  **Token Return**: Returns the locked tokens to the order creator using `makeCaPay`, transferring `ordersInsideMarket[market][metadata.orderId].amountA` of `metadata.tokenA` back to `user`.
+    
+7.  **Order Removal**: Marks the order as cancelled by setting the seller address to `address(0)`.
+    
+8.  **Staker Reward Distribution**: If the executor (`msg.sender`) is a registered staker:
+    
+    *   **MATE Token Rewards**: Grants MATE tokens to the executor:
+        *   3x base reward amount + priority fee if priority fee was provided
+        *   2x base reward amount if no priority fee
+9.  **Market Update**: Decrements the `ordersAvailable` counter for the market.
+    
+10.  **Nonce Update**: Marks the P2P nonce as used to prevent replay attacks.
+
+P2P Signature Verification: Validates the embedded metadata.signature against the user address and cancellation parameters using SignatureUtils.verifyMessageSignedForCancelOrder. Reverts with "Invalid signature" on failure.
+
+Market Resolution: Finds the market for the token pair using findMarket(metadata.tokenA, metadata.tokenB).
+
+Nonce Validation: Checks if the P2P nonce has been used before by consulting nonceP2PSwap[user][metadata.nonce]. Reverts with "Invalid nonce" if the nonce was previously used.
+
+Order Ownership Verification: Validates that:
+
+*   The market exists (market != 0)
+*   The order exists and belongs to the requesting user
+*   Reverts with `"Invalid order"` if validation fails
+
+Priority Fee Processing: If _priorityFee_Evvm > 0, processes the priority fee payment using makePay with MATE tokens.
+
+Token Return: Returns the locked tokens to the order creator using makeCaPay, transferring ordersInsideMarket[market][metadata.orderId].amountA of metadata.tokenA back to user.
+
+Order Removal: Marks the order as cancelled by setting the seller address to address(0).
+
+Staker Reward Distribution: If the executor (msg.sender) is a registered staker:
+
+*   **MATE Token Rewards**: Grants MATE tokens to the executor:
+    *   3x base reward amount + priority fee if priority fee was provided
+    *   2x base reward amount if no priority fee
+
+*   3x base reward amount + priority fee if priority fee was provided
+*   2x base reward amount if no priority fee
+
+Market Update: Decrements the ordersAvailable counter for the market.
+
+Nonce Update: Marks the P2P nonce as used to prevent replay attacks.
+
+### Example​
+
+Scenario: User wants to cancel their order offering 100 USDC for 0.05 ETH
+
+Parameters:
+
+*   `user`: `0x742c7b6b472c8f4bd58e6f9f6c82e8e6e7c82d8c`
+*   `metadata.nonce`: `25`
+*   `metadata.tokenA`: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (USDC)
+*   `metadata.tokenB`: `0x0000000000000000000000000000000000000000` (ETH)
+*   `metadata.orderId`: `3`
+*   `_priorityFee_Evvm`: `0` (no priority fee)
+
+Process:
+
+1.  User signs the cancellation details with their private key
+2.  Fisher or user submits the transaction
+3.  Contract validates signature and order ownership
+4.  100 USDC is returned to the user's balance
+5.  Order #3 is marked as cancelled in the USDC/ETH market
+6.  Staker executor receives 2x MATE reward (no priority fee)
+
+Market Impact:
+
+*   Market's `ordersAvailable` count decreases by 1
+*   Order slot becomes available for reuse
+*   Market statistics reflect the cancellation
+
+Token Recovery:
+
+*   Original 100 USDC locked in the order is returned to user
+*   User can immediately use these tokens for other purposes
+*   No fees charged for order cancellation
+
+For signature structure details, see Cancel Order Signature Structure
+
+Want to create a new order?
+Use makeOrder to create a new swap order with different parameters.
+
+Looking to fulfill someone else's order?
+Check dispatchOrder to execute existing orders in the marketplace.
+
+## dispatchOrder_fillFixedFee Function
+[Permalink for this section](https://www.evvm.info/docs/P2PSwap/OrderFunctions/dispatchOrder-fixed)
+
+Function Type: external
+Function Signature: dispatchOrder_fillFixedFee(address,MetadataDispatchOrder,uint256,uint256,bool,bytes,uint256)
+
+The dispatchOrder_fillFixedFee function fulfills existing swap orders using a fixed fee model with maximum fee caps to protect users from excessive charges on large orders. This hybrid approach uses proportional calculation up to a maximum limit provided in the function call.
+
+Key features:
+
+*   **Capped Fee Structure**: Maximum fee limit protects users from excessive charges
+*   **Hybrid Fee Model**: Uses proportional calculation up to the maximum limit
+*   **User Protection**: Prevents fee exploitation on large orders
+*   **Flexible Payment**: Supports partial fee payment within acceptable ranges
+*   **Enhanced Rewards**: Higher rewards for complex fee calculations
+
+### Parameters​
+
+Field
+
+Type
+
+Description
+
+`user`
+
+`address`
+
+The address fulfilling the order (buyer) whose signature is verified
+
+`metadata`
+
+`MetadataDispatchOrder`
+
+Struct containing dispatch details and embedded signature
+
+`_priorityFee_Evvm`
+
+`uint256`
+
+Priority fee for EVVM transaction processing
+
+`_nonce_Evvm`
+
+`uint256`
+
+Nonce for EVVM payment transaction
+
+`_priority_Evvm`
+
+`bool`
+
+Priority flag for EVVM payment (sync/async)
+
+`_signature_Evvm`
+
+`bytes`
+
+EIP-191 signature for EVVM payment authorization
+
+`_amountOut`
+
+`uint256`
+
+The maximum fee amount (fee cap) for the transaction. This value acts as the upper limit for the fee calculation.
+
+### Fee Calculation Logic​
+
+The fixed fee model uses a two-tier calculation where the fee is the lesser of a proportional fee and an externally provided cap:
+
+1.  **Standard Proportional Fee**: Calculated as `(orderAmount * percentageFee) / 10_000`.
+2.  **External Fee Cap**: Provided by the `_amountOut` parameter in the function call.
+3.  **Final Fee**: The final fee is `min(proportionalFee, _amountOut)`.
+
+### Fee Flexibility​
+
+The function accepts payments within a range:
+
+*   **Minimum**: `orderAmount + fee - (fee * 10%)`
+*   **Maximum**: `orderAmount + fee`
+*   **Actual Fee Used**: Based on amount provided by user
+
+### Execution Methods​
+
+#### Fisher Execution​
+
+1.  User signs dispatch details and EVVM payment authorization
+2.  Fisher captures the transaction and validates all signatures
+3.  Fisher submits the transaction with appropriate fee calculation
+4.  Order is fulfilled with optimized fee structure
+
+#### Direct Execution​
+
+1.  User or authorized service calls the function directly
+2.  Fee calculations are performed on-chain
+3.  Order fulfillment uses the most favorable fee structure
+4.  Enhanced rewards for complex processing
+
+### Workflow​
+
+1.  **P2P Signature Verification**: Validates the embedded `metadata.signature` against the `user` address and dispatch parameters using `SignatureUtils.verifyMessageSignedForDispatchOrder`. Reverts with `"Invalid signature"` on failure.
+    
+2.  **Market Resolution**: Finds the market for the token pair using `findMarket(metadata.tokenA, metadata.tokenB)`.
+    
+3.  **Nonce Validation**: Checks if the P2P nonce has been used before. Reverts with `"Invalid nonce"` if the nonce was previously used.
+    
+4.  **Order Validation**: Verifies that the market exists and the order is active. Reverts with `"Invalid order"` if validation fails.
+    
+5.  **Fee Calculation**: Calculates both fee amounts using `calculateFillFixedFee`:
+    
+    *   `fee`: The actual fee to be charged (capped amount)
+    *   `fee10`: 10% of the fee (for minimum payment calculation)
+6.  **Payment Validation**: Ensures `metadata.amountOfTokenBToFill` meets minimum requirement:
+    
+    *   Minimum: `orderAmount + fee - fee10`
+    *   Reverts with `"Insufficient amountOfTokenBToFill"` if insufficient
+7.  **Token Payment**: Processes the buyer's payment using `makePay`.
+    
+8.  **Final Fee Determination**: Calculates the actual fee based on payment amount:
+    
+    *   If payment is between minimum and full fee: uses `paymentAmount - orderAmount`
+    *   If payment is full fee or more: uses the calculated `fee`
+9.  **Excess Refund**: If payment exceeds `orderAmount + fee`, refunds the excess.
+    
+10.  **Fee Distribution Setup**: Creates distribution array with calculated amounts:
+     
+     *   Seller payment: order amount + seller's portion of final fee
+     *   Executor payment: priority fee + staker's portion of final fee
+11.  **Service Fee Accumulation**: Adds service portion of final fee to contract treasury.
+     
+12.  **Payment Distribution**: Executes distribution using `makeDisperseCaPay`.
+     
+13.  **Token A Transfer**: Transfers seller's tokenA to the buyer.
+     
+14.  **Enhanced Staker Rewards**: If executor is a staker:
+     
+     *   **Premium MATE Rewards**: 5x base reward if excess was refunded, 4x otherwise
+15.  **Order Cleanup**: Marks order as completed and updates market statistics.
+     
+16.  **Nonce Update**: Marks P2P nonce as used.
+
+P2P Signature Verification: Validates the embedded metadata.signature against the user address and dispatch parameters using SignatureUtils.verifyMessageSignedForDispatchOrder. Reverts with "Invalid signature" on failure.
+
+Market Resolution: Finds the market for the token pair using findMarket(metadata.tokenA, metadata.tokenB).
+
+Nonce Validation: Checks if the P2P nonce has been used before. Reverts with "Invalid nonce" if the nonce was previously used.
+
+Order Validation: Verifies that the market exists and the order is active. Reverts with "Invalid order" if validation fails.
+
+Fee Calculation: Calculates both fee amounts using calculateFillFixedFee:
+
+*   `fee`: The actual fee to be charged (capped amount)
+*   `fee10`: 10% of the fee (for minimum payment calculation)
+
+Payment Validation: Ensures metadata.amountOfTokenBToFill meets minimum requirement:
+
+*   Minimum: `orderAmount + fee - fee10`
+*   Reverts with `"Insufficient amountOfTokenBToFill"` if insufficient
+
+Token Payment: Processes the buyer's payment using makePay.
+
+Final Fee Determination: Calculates the actual fee based on payment amount:
+
+*   If payment is between minimum and full fee: uses `paymentAmount - orderAmount`
+*   If payment is full fee or more: uses the calculated `fee`
+
+Excess Refund: If payment exceeds orderAmount + fee, refunds the excess.
+
+Fee Distribution Setup: Creates distribution array with calculated amounts:
+
+*   Seller payment: order amount + seller's portion of final fee
+*   Executor payment: priority fee + staker's portion of final fee
+
+Service Fee Accumulation: Adds service portion of final fee to contract treasury.
+
+Payment Distribution: Executes distribution using makeDisperseCaPay.
+
+Token A Transfer: Transfers seller's tokenA to the buyer.
+
+Enhanced Staker Rewards: If executor is a staker:
+
+*   **Premium MATE Rewards**: 5x base reward if excess was refunded, 4x otherwise
+
+Order Cleanup: Marks order as completed and updates market statistics.
+
+Nonce Update: Marks P2P nonce as used.
+
+### Example​
+
+Scenario: Large order with fee cap protection
+
+Existing Order:
+
+*   Seller offers: 10,000 USDC
+*   Seller wants: 5 ETH
+*   Proportional fee (5%): 0.25 ETH
+*   Fee cap (from `_amountOut`): 0.001 ETH
+*   **Actual fee**: 0.001 ETH (capped)
+
+Parameters:
+
+*   `metadata.amountOfTokenBToFill`: `5000900000000000000` (5.0009 ETH)
+*   `_amountOut`: `1000000000000000` (0.001 ETH cap)
+
+Fee Calculation:
+
+*   Standard fee would be: 0.25 ETH (5% of 5 ETH)
+*   Fee cap applies: 0.001 ETH
+*   10% reduction: 0.0001 ETH
+*   Minimum payment: 5 ETH + 0.001 ETH - 0.0001 ETH = 5.0009 ETH
+
+Payment Flexibility:
+
+*   User pays: 5.0009 ETH (minimum acceptable)
+*   Actual fee charged: 0.0009 ETH (payment - order amount)
+*   User saves: 0.2491 ETH compared to proportional fee
+
+Fee Distribution:
+
+*   Seller receives: 5 ETH + seller's portion of 0.0009 ETH
+*   Service treasury: service portion of 0.0009 ETH
+*   Executor receives: priority fee + staker portion of 0.0009 ETH
+
+Benefits:
+
+*   **User Protection**: Massive fee savings on large orders
+*   **Flexibility**: Can pay anywhere from minimum to full fee
+*   **Fair Distribution**: Fees still distributed proportionally
+*   **Enhanced Rewards**: Executor gets premium MATE rewards
+
+For signature structure details, see Dispatch Order Signature Structure
+
+Prefer predictable fees?
+Use dispatchOrder_fillPropotionalFee for percentage-based fees.
+
+Want to create your own order?
+Use makeOrder to create a new swap order with your preferred terms.
+
+## dispatchOrder_fillPropotionalFee Function
+[Permalink for this section](https://www.evvm.info/docs/P2PSwap/OrderFunctions/dispatchOrder-proportional)
+
+Function Type: external
+Function Signature: dispatchOrder_fillPropotionalFee(address,MetadataDispatchOrder,uint256,uint256,bool,bytes)
+
+The dispatchOrder_fillPropotionalFee function fulfills existing swap orders using a proportional fee model where fees are calculated as a percentage of the order amount. This function handles token exchanges, fee distribution, and reward allocation.
+
+Key features:
+
+*   **Order Fulfillment**: Executes existing swap orders from the marketplace
+*   **Proportional Fees**: Fees calculated as a configurable percentage of order amount
+*   **Three-Way Fee Split**: Fees distributed between seller, service, and MATE stakers
+*   **Token Exchange**: Automatic token swap between buyer and seller
+*   **Staker Rewards**: Enhanced rewards for staker executors
+
+### Parameters​
+
+Field
+
+Type
+
+Description
+
+`user`
+
+`address`
+
+The address fulfilling the order (buyer) whose signature is verified
+
+`metadata`
+
+`MetadataDispatchOrder`
+
+Struct containing dispatch details and embedded signature
+
+`_priorityFee_Evvm`
+
+`uint256`
+
+Priority fee for EVVM transaction processing
+
+`_nonce_Evvm`
+
+`uint256`
+
+Nonce for EVVM payment transaction
+
+`_priority_Evvm`
+
+`bool`
+
+Priority flag for EVVM payment (sync/async)
+
+`_signature_Evvm`
+
+`bytes`
+
+EIP-191 signature for EVVM payment authorization
+
+### MetadataDispatchOrder Structure​
+
+Field
+
+Type
+
+Description
+
+`nonce`
+
+`uint256`
+
+Unique nonce for P2P Swap replay protection
+
+`tokenA`
+
+`address`
+
+Token offered in the original order
+
+`tokenB`
+
+`address`
+
+Token requested in the original order
+
+`orderId`
+
+`uint256`
+
+ID of the order to be fulfilled
+
+`amountOfTokenBToFill`
+
+`uint256`
+
+Amount of tokenB the buyer is providing (must cover order + fees)
+
+`signature`
+
+`bytes`
+
+EIP-191 signature from `user` authorizing the dispatch
+
+### Fee Calculation​
+
+The proportional fee is calculated as:
+
+```codeBlockLines_e6Vv
+fee = (orderAmount * percentageFee) / 10_000
+```
+
+Where percentageFee is configurable (default: 500 = 5%).
+
+### Fee Distribution​
+
+Fees are distributed according to the rewardPercentage structure:
+
+*   **Seller Portion**: Added to the seller's payment as bonus
+*   **Service Portion**: Accumulated in contract treasury
+*   **MATE Staker Portion**: Distributed to the executor (if staker)
+
+### Execution Methods​
+
+#### Fisher Execution​
+
+1.  User signs dispatch details and EVVM payment authorization
+2.  Fisher captures the transaction and validates all signatures
+3.  Fisher submits the transaction and receives enhanced rewards if staker
+4.  Order is fulfilled and tokens are exchanged
+
+#### Direct Execution​
+
+1.  User or authorized service calls the function directly
+2.  All signature validations are performed on-chain
+3.  Order fulfillment and token exchange happen immediately
+4.  Staker benefits are distributed if executor qualifies
+
+### Workflow​
+
+1.  **P2P Signature Verification**: Validates the embedded `metadata.signature` against the `user` address and dispatch parameters using `SignatureUtils.verifyMessageSignedForDispatchOrder`. Reverts with `"Invalid signature"` on failure.
+    
+2.  **Market Resolution**: Finds the market for the token pair using `findMarket(metadata.tokenA, metadata.tokenB)`.
+    
+3.  **Nonce Validation**: Checks if the P2P nonce has been used before by consulting `nonceP2PSwap[user][metadata.nonce]`. Reverts with `"Invalid nonce"` if the nonce was previously used.
+    
+4.  **Order Validation**: Verifies that:
+    
+    *   The market exists (market != 0)
+    *   The order exists and is active (seller != address(0))
+    *   Reverts if validation fails
+5.  **Fee Calculation**: Calculates the proportional fee using `calculateFillPropotionalFee(ordersInsideMarket[market][metadata.orderId].amountB)`.
+    
+6.  **Amount Validation**: Ensures `metadata.amountOfTokenBToFill` is sufficient to cover the order amount plus fees. Reverts with `"Insuficient amountOfTokenToFill"` if insufficient.
+    
+7.  **Token Payment**: Processes the buyer's payment using `makePay`, transferring `metadata.amountOfTokenBToFill` of `metadata.tokenB` from `user` to the contract.
+    
+8.  **Excess Refund**: If the buyer provided more than required (order + fee), refunds the excess using `makeCaPay`.
+    
+9.  **Fee Distribution Setup**: Creates distribution array with:
+    
+    *   Seller payment: order amount + seller's fee portion
+    *   Executor payment: priority fee + staker's fee portion
+10.  **Service Fee Accumulation**: Adds the service portion of fees to `balancesOfContract[metadata.tokenB]`.
+     
+11.  **Payment Distribution**: Executes the distribution using `makeDisperseCaPay` to pay both seller and executor.
+     
+12.  **Token A Transfer**: Transfers the seller's tokenA to the buyer using `makeCaPay`.
+     
+13.  **Staker Reward Distribution**: If the executor is a staker:
+     
+     *   **Enhanced MATE Rewards**: Grants additional MATE tokens:
+         *   5x base reward if excess was refunded
+         *   4x base reward for standard fulfillment
+14.  **Order Cleanup**: Marks the order as completed by setting seller to `address(0)` and decrements market's `ordersAvailable`.
+     
+15.  **Nonce Update**: Marks the P2P nonce as used to prevent replay attacks.
+
+P2P Signature Verification: Validates the embedded metadata.signature against the user address and dispatch parameters using SignatureUtils.verifyMessageSignedForDispatchOrder. Reverts with "Invalid signature" on failure.
+
+Market Resolution: Finds the market for the token pair using findMarket(metadata.tokenA, metadata.tokenB).
+
+Nonce Validation: Checks if the P2P nonce has been used before by consulting nonceP2PSwap[user][metadata.nonce]. Reverts with "Invalid nonce" if the nonce was previously used.
+
+Order Validation: Verifies that:
+
+*   The market exists (market != 0)
+*   The order exists and is active (seller != address(0))
+*   Reverts if validation fails
+
+Fee Calculation: Calculates the proportional fee using calculateFillPropotionalFee(ordersInsideMarket[market][metadata.orderId].amountB).
+
+Amount Validation: Ensures metadata.amountOfTokenBToFill is sufficient to cover the order amount plus fees. Reverts with "Insuficient amountOfTokenToFill" if insufficient.
+
+Token Payment: Processes the buyer's payment using makePay, transferring metadata.amountOfTokenBToFill of metadata.tokenB from user to the contract.
+
+Excess Refund: If the buyer provided more than required (order + fee), refunds the excess using makeCaPay.
+
+Fee Distribution Setup: Creates distribution array with:
+
+*   Seller payment: order amount + seller's fee portion
+*   Executor payment: priority fee + staker's fee portion
+
+Service Fee Accumulation: Adds the service portion of fees to balancesOfContract[metadata.tokenB].
+
+Payment Distribution: Executes the distribution using makeDisperseCaPay to pay both seller and executor.
+
+Token A Transfer: Transfers the seller's tokenA to the buyer using makeCaPay.
+
+Staker Reward Distribution: If the executor is a staker:
+
+*   **Enhanced MATE Rewards**: Grants additional MATE tokens:
+    *   5x base reward if excess was refunded
+    *   4x base reward for standard fulfillment
+
+*   5x base reward if excess was refunded
+*   4x base reward for standard fulfillment
+
+Order Cleanup: Marks the order as completed by setting seller to address(0) and decrements market's ordersAvailable.
+
+Nonce Update: Marks the P2P nonce as used to prevent replay attacks.
+
+### Example​
+
+Scenario: User wants to fulfill an order offering 100 USDC for 0.05 ETH (5% fee)
+
+Existing Order:
+
+*   Seller offers: 100 USDC
+*   Seller wants: 0.05 ETH
+*   Market: USDC/ETH, Order ID: 3
+
+Parameters:
+
+*   `user`: `0x123...` (buyer)
+*   `metadata.amountOfTokenBToFill`: `52500000000000000` (0.0525 ETH = 0.05 + 0.0025 fee)
+*   `_priorityFee_Evvm`: `1000000000000000` (0.001 ETH)
+
+Fee Calculation:
+
+*   Order amount: 0.05 ETH
+*   Proportional fee (5%): 0.0025 ETH
+*   Total required: 0.0525 ETH
+
+Fee Distribution (assuming 50%/40%/10% split):
+
+*   Seller receives: 0.05 ETH + 0.00125 ETH (50% of fee) = 0.05125 ETH
+*   Service treasury: 0.001 ETH (40% of fee)
+*   Executor receives: 0.001 ETH (priority) + 0.00025 ETH (10% of fee) = 0.00125 ETH
+
+Final Exchange:
+
+*   Buyer pays: 0.0525 ETH
+*   Buyer receives: 100 USDC
+*   Seller receives: 0.05125 ETH (order + bonus)
+*   Executor receives: 0.00125 ETH + 4x MATE rewards
+
+For signature structure details, see Dispatch Order Signature Structure
+
+Want fixed fee protection?
+Use dispatchOrder_fillFixedFee for capped fees on large orders.
+
+Looking for orders to fulfill?
+Check the Getter Functions to browse available orders in different markets.
+
+## makeOrder Function
+[Permalink for this section](https://www.evvm.info/docs/P2PSwap/OrderFunctions/makeOrder)
+
+Function Type: external
+Function Signature: makeOrder(address,MetadataMakeOrder,bytes,uint256,uint256,bool,bytes)
+
+The makeOrder function creates a new token swap order in the P2P marketplace, allowing users to offer one token in exchange for another at a specified rate. This function handles market creation, order storage, and reward distribution for staker executors.
+
+Key features:
+
+*   **Order Creation**: Establishes a new swap order offering tokenA for tokenB
+*   **Automatic Market Creation**: Creates new markets for previously unseen token pairs
+*   **Staker Rewards**: Executors who are stakers receive MATE token rewards and priority fees
+*   **Signature Verification**: Uses EIP-191 signatures for secure authorization
+*   **EVVM Integration**: Leverages EVVM payment system for token transfers
+
+### Parameters​
+
+Field
+
+Type
+
+Description
+
+`user`
+
+`address`
+
+The address creating the order whose tokens will be locked and signature is verified
+
+`metadata`
+
+`MetadataMakeOrder`
+
+Struct containing order details (nonce, tokenA, tokenB, amountA, amountB)
+
+`signature`
+
+`bytes`
+
+EIP-191 signature from `user` authorizing the order creation
+
+`_priorityFee_Evvm`
+
+`uint256`
+
+Fee amount distributed to stakers as reward for processing the transaction.
+
+`_nonce_Evvm`
+
+`uint256`
+
+Nonce for EVVM payment transaction
+
+`_priority_Evvm`
+
+`bool`
+
+Priority flag (sync/async) for the EVVM payment function call.
+
+`_signature_Evvm`
+
+`bytes`
+
+EIP-191 signature for EVVM payment authorization
+
+### MetadataMakeOrder Structure​
+
+Field
+
+Type
+
+Description
+
+`nonce`
+
+`uint256`
+
+Unique nonce for P2P Swap replay protection
+
+`tokenA`
+
+`address`
+
+Token being offered by the order creator
+
+`tokenB`
+
+`address`
+
+Token being requested in exchange
+
+`amountA`
+
+`uint256`
+
+Amount of tokenA being offered
+
+`amountB`
+
+`uint256`
+
+Amount of tokenB being requested
+
+### Return Values​
+
+Field
+
+Type
+
+Description
+
+`market`
+
+`uint256`
+
+ID of the market where the order was placed
+
+`orderId`
+
+`uint256`
+
+Unique ID of the created order within the market
+
+### Execution Methods​
+
+#### Fisher Execution​
+
+1.  User signs both P2P order details and EVVM payment authorization
+2.  Fisher captures the transaction and validates all signatures
+3.  Fisher submits the transaction and receives staker rewards if eligible
+4.  Order is created and tokens are locked in the contract
+
+#### Direct Execution​
+
+1.  User or authorized service calls the function directly
+2.  All signature validations are performed on-chain
+3.  Order creation and token locking happen immediately
+4.  Staker benefits are distributed if executor qualifies
+
+### Workflow​
+
+1.  **P2P Signature Verification**: Validates the `signature` against the `user` address and order metadata using `SignatureUtils.verifyMessageSignedForMakeOrder`. Reverts with `"Invalid signature"` on failure.
+    
+2.  **Nonce Validation**: Checks if the P2P nonce has been used before by consulting `nonceP2PSwap[user][metadata.nonce]`. Reverts with `"Nonce already used"` if the nonce was previously used.
+    
+3.  **Token Transfer**: Executes payment to lock the user's tokens using `makePay` with the provided EVVM parameters, transferring `metadata.amountA` of `metadata.tokenA` from `user` to the contract.
+    
+4.  **Market Resolution**: Determines the appropriate market using `findMarket(metadata.tokenA, metadata.tokenB)`. If no market exists (returns 0), creates a new market using `createMarket`.
+    
+5.  **Order ID Assignment**: Assigns an order ID within the market:
+    
+    *   If market is at capacity (`maxSlot == ordersAvailable`), increments `maxSlot` and uses the new slot
+    *   Otherwise, finds the first available slot by iterating through existing orders
+    *   Updates `ordersAvailable` counter
+6.  **Order Storage**: Stores the order in `ordersInsideMarket[market][orderId]` with seller address, token amounts, and metadata.
+    
+7.  **Staker Reward Distribution**: If the executor (`msg.sender`) is a registered staker:
+    
+    *   **Priority Fee Transfer**: If `_priorityFee_Evvm > 0`, transfers the priority fee in `metadata.tokenA` to the executor
+    *   **MATE Token Rewards**: Grants MATE tokens to the executor:
+        *   3x base reward amount if priority fee was provided
+        *   2x base reward amount if no priority fee
+8.  **Nonce Update**: Marks the P2P nonce as used to prevent replay attacks.
+
+P2P Signature Verification: Validates the signature against the user address and order metadata using SignatureUtils.verifyMessageSignedForMakeOrder. Reverts with "Invalid signature" on failure.
+
+Nonce Validation: Checks if the P2P nonce has been used before by consulting nonceP2PSwap[user][metadata.nonce]. Reverts with "Nonce already used" if the nonce was previously used.
+
+Token Transfer: Executes payment to lock the user's tokens using makePay with the provided EVVM parameters, transferring metadata.amountA of metadata.tokenA from user to the contract.
+
+Market Resolution: Determines the appropriate market using findMarket(metadata.tokenA, metadata.tokenB). If no market exists (returns 0), creates a new market using createMarket.
+
+Order ID Assignment: Assigns an order ID within the market:
+
+*   If market is at capacity (`maxSlot == ordersAvailable`), increments `maxSlot` and uses the new slot
+*   Otherwise, finds the first available slot by iterating through existing orders
+*   Updates `ordersAvailable` counter
+
+Order Storage: Stores the order in ordersInsideMarket[market][orderId] with seller address, token amounts, and metadata.
+
+Staker Reward Distribution: If the executor (msg.sender) is a registered staker:
+
+*   **Priority Fee Transfer**: If `_priorityFee_Evvm > 0`, transfers the priority fee in `metadata.tokenA` to the executor
+*   **MATE Token Rewards**: Grants MATE tokens to the executor:
+    *   3x base reward amount if priority fee was provided
+    *   2x base reward amount if no priority fee
+
+*   3x base reward amount if priority fee was provided
+*   2x base reward amount if no priority fee
+
+Nonce Update: Marks the P2P nonce as used to prevent replay attacks.
+
+### Example​
+
+Scenario: User wants to create an order offering 100 USDC for 0.05 ETH
+
+Parameters:
+
+*   `user`: `0x742c7b6b472c8f4bd58e6f9f6c82e8e6e7c82d8c`
+*   `metadata.nonce`: `15`
+*   `metadata.tokenA`: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (USDC)
+*   `metadata.tokenB`: `0x0000000000000000000000000000000000000000` (ETH)
+*   `metadata.amountA`: `100000000` (100 USDC, 6 decimals)
+*   `metadata.amountB`: `50000000000000000` (0.05 ETH in wei)
+*   `_priorityFee_Evvm`: `1000000000000000` (0.001 ETH priority fee)
+
+Process:
+
+1.  User signs the order details with their private key
+2.  Fisher or user submits the transaction
+3.  Contract validates signature and transfers 100 USDC to contract
+4.  Order is assigned to USDC/ETH market (created if new)
+5.  Order stored with unique ID for future fulfillment
+6.  Staker executor receives priority fee + 3x MATE reward
+
+Market Creation:
+If this is the first USDC/ETH order:
+
+*   New market created with ID (e.g., market #5)
+*   Market metadata initialized for USDC/ETH pair
+*   Order becomes first order in the new market
+
+Order Assignment:
+
+*   Order receives ID #1 in the market
+*   Market statistics updated (maxSlot: 1, ordersAvailable: 1)
+*   Order can now be discovered and fulfilled by other users
+
+For signature structure details, see Make Order Signature Structure
+
+Want to cancel your order?
+Use cancelOrder to cancel your order and reclaim your tokens.
+
+Looking for existing orders?
+Check the Getter Functions to browse available orders in different markets.
+
+## Cancel Order Signature Structure
+[Permalink for this section](https://www.evvm.info/docs/SignatureStructures/P2PSwap/CancelOrderSignatureStructure)
+
+To authorize order cancellation operations, users must generate a cryptographic signature compliant with the EIP-191 standard using the Ethereum Signed Message format.
+
+The signature verification process uses the SignatureRecover library which implements the standard Ethereum message signing protocol. The message is constructed by concatenating the EVVM ID, action type, and parameters, then wrapped with the EIP-191 prefix.
+
+## Signed Message Format​
+
+The signature verification uses the SignatureRecover.signatureVerification function with the following structure:
+
+```codeBlockLines_e6Vv
+SignatureRecover.signatureVerification(    Strings.toString(evvmID),        // EVVM ID as string    "cancelOrder",                   // Action type    string.concat(                   // Concatenated parameters        Strings.toString(_nonce),        ",",        AdvancedStrings.addressToString(_tokenA),        ",",        AdvancedStrings.addressToString(_tokenB),        ",",        Strings.toString(_orderId)    ),    signature,    signer);
+```
+
+### Internal Message Construction​
+
+Internally, the SignatureRecover.signatureVerification function constructs the final message by concatenating:
+
+```codeBlockLines_e6Vv
+string.concat(evvmID, ",", functionName, ",", inputs)
+```
+
+This results in a message format:
+
+```codeBlockLines_e6Vv
+"{evvmID},cancelOrder,{nonce},{tokenA},{tokenB},{orderId}"
+```
+
+### EIP-191 Message Hashing​
+
+The message is then hashed according to EIP-191 standard:
+
+```codeBlockLines_e6Vv
+bytes32 messageHash = keccak256(    abi.encodePacked(        "\x19Ethereum Signed Message:\n",        Strings.toString(bytes(message).length),        message    ));
+```
+
+This creates the final hash that the user must sign with their private key.
+
+## Message Components​
+
+The signature verification takes three main parameters:
+
+1. EVVM ID (String):
+
+*   The result of `Strings.toString(evvmID)`
+*   _Purpose_: Identifies the specific EVVM instance
+
+2. Action Type (String):
+
+*   Fixed value: `"cancelOrder"`
+*   _Purpose_: Identifies this as an order cancellation operation
+
+3. Concatenated Parameters (String):
+The parameters are concatenated with comma separators:
+
+3.1. Nonce (String):
+
+*   The result of `Strings.toString(_nonce)`
+*   _Purpose_: Provides replay protection for the P2P Swap transaction
+
+3.2. Token A Address (String):
+
+*   The result of `AdvancedStrings.addressToString(_tokenA)`
+*   _Purpose_: Identifies the token that was offered in the original order
+
+3.3. Token B Address (String):
+
+*   The result of `AdvancedStrings.addressToString(_tokenB)`
+*   _Purpose_: Identifies the token that was requested in the original order
+
+3.4. Order ID (String):
+
+*   The result of `Strings.toString(_orderId)`
+*   _Purpose_: Specifies the unique ID of the order to be cancelled
+
+## Example​
+
+Here's a practical example of constructing a signature message for cancelling a swap order:
+
+Scenario: User wants to cancel their order #3 in the USDC/ETH market
+
+Parameters:
+
+*   `evvmID`: `1` (EVVM instance ID)
+*   `_nonce`: `25`
+*   `_tokenA`: `0xA0b86a33E6441e6e80D0c4C6C7527d72E1d00000` (USDC)
+*   `_tokenB`: `0x0000000000000000000000000000000000000000` (ETH)
+*   `_orderId`: `3`
+
+Signature verification call:
+
+```codeBlockLines_e6Vv
+SignatureRecover.signatureVerification(    "1",  // evvmID as string    "cancelOrder", // action type    "25,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,3",    signature,    signer);
+```
+
+Final message to be signed (after internal concatenation):
+
+```codeBlockLines_e6Vv
+1,cancelOrder,25,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,3
+```
+
+EIP-191 formatted message hash:
+
+```codeBlockLines_e6Vv
+keccak256(abi.encodePacked(    "\x19Ethereum Signed Message:\n134",    "1,cancelOrder,25,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,3"))
+```
+
+Concatenated parameters breakdown:
+
+1.  `25` - P2P Swap nonce for replay protection
+2.  `0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000` - USDC token address (tokenA from original order)
+3.  `0x0000000000000000000000000000000000000000` - ETH address (tokenB from original order)
+4.  `3` - Order ID to be cancelled
+
+## Example with Different Token Pair​
+
+Scenario: User wants to cancel their order #7 in the MATE/USDC market
+
+Parameters:
+
+*   `evvmID`: `1`
+*   `_nonce`: `42`
+*   `_tokenA`: `0x0000000000000000000000000000000000000001` (MATE)
+*   `_tokenB`: `0xA0b86a33E6441e6e80D0c4C6C7527d72E1d00000` (USDC)
+*   `_orderId`: `7`
+
+Final message to be signed:
+
+```codeBlockLines_e6Vv
+1,cancelOrder,42,0x0000000000000000000000000000000000000001,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,7
+```
+
+Concatenated parameters breakdown:
+
+1.  `42` - P2P Swap nonce
+2.  `0x0000000000000000000000000000000000000001` - MATE token address
+3.  `0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000` - USDC token address
+4.  `7` - Order ID to cancel
+
+## Signature Implementation Details​
+
+The SignatureRecover library performs signature verification in the following steps:
+
+1.  **Message Construction**: Concatenates `evvmID`, `functionName`, and `inputs` with commas
+2.  **EIP-191 Formatting**: Prepends `"\x19Ethereum Signed Message:\n"` + message length
+3.  **Hashing**: Applies `keccak256` to the formatted message
+4.  **Signature Parsing**: Splits the 65-byte signature into `r`, `s`, and `v` components
+5.  **Recovery**: Uses `ecrecover` to recover the signer's address
+6.  **Verification**: Compares recovered address with expected signer
+
+### Signature Format Requirements​
+
+*   **Length**: Exactly 65 bytes
+*   **Structure**: `[r (32 bytes)][s (32 bytes)][v (1 byte)]`
+*   **V Value**: Must be 27 or 28 (automatically adjusted if < 27)
+
+## Security Considerations​
+
+### Order Ownership Validation​
+
+The signature alone does not prove order ownership. The contract performs additional validation:
+
+1.  **Signature Verification**: Confirms the user signed the cancellation request
+2.  **Order Existence**: Verifies the order exists in the specified market
+3.  **Ownership Check**: Confirms the signer is the original order creator
+4.  **Nonce Validation**: Ensures the nonce hasn't been used before
+
+### Market Identification​
+
+The token pair (tokenA, tokenB) must match the original order exactly:
+
+*   **Token Addresses**: Must be identical to the original order
+*   **Market Resolution**: Used to find the correct market for the order
+*   **Order Lookup**: Combined with orderId to locate the specific order
+
+*   **Message Format**: The final message follows the pattern `"{evvmID},{functionName},{parameters}"`
+*   **EIP-191 Compliance**: Uses `"\x19Ethereum Signed Message:\n"` prefix with message length
+*   **Hash Function**: `keccak256` is used for the final message hash before signing
+*   **Signature Recovery**: Uses `ecrecover` to verify the signature against the expected signer
+*   **String Conversion**:
+    *   `AdvancedStrings.addressToString` converts addresses to lowercase hex with "0x" prefix
+    *   `Strings.toString` converts numbers to decimal strings
+*   **Order Identification**: Requires both token pair and order ID to uniquely identify the order
+*   **Nonce Independence**: P2P Swap nonces are separate from EVVM payment nonces
+
+*   `AdvancedStrings.addressToString` converts addresses to lowercase hex with "0x" prefix
+*   `Strings.toString` converts numbers to decimal strings
+
+*   [Signed Message Format](#signed-message-format)
+    *   [Internal Message Construction](#internal-message-construction)
+    *   [EIP-191 Message Hashing](#eip-191-message-hashing)
+*   [Message Components](#message-components)
+*   [Example](#example)
+*   [Example with Different Token Pair](#example-with-different-token-pair)
+*   [Signature Implementation Details](#signature-implementation-details)
+    *   [Signature Format Requirements](#signature-format-requirements)
+*   [Security Considerations](#security-considerations)
+    *   [Order Ownership Validation](#order-ownership-validation)
+    *   [Market Identification](#market-identification)
+
+## Dispatch Order Signature Structure
+[Permalink for this section](https://www.evvm.info/docs/SignatureStructures/P2PSwap/DispatchOrderSignatureStructure)
+
+To authorize order fulfillment operations, users must generate a cryptographic signature compliant with the EIP-191 standard using the Ethereum Signed Message format.
+
+The signature verification process uses the SignatureRecover library which implements the standard Ethereum message signing protocol. This signature is used for both dispatchOrder_fillPropotionalFee and dispatchOrder_fillFixedFee functions.
+
+## Signed Message Format​
+
+The signature verification uses the SignatureRecover.signatureVerification function with the following structure:
+
+```codeBlockLines_e6Vv
+SignatureRecover.signatureVerification(    Strings.toString(evvmID),        // EVVM ID as string    "dispatchOrder",                 // Action type    string.concat(                   // Concatenated parameters        Strings.toString(_nonce),        ",",        AdvancedStrings.addressToString(_tokenA),        ",",        AdvancedStrings.addressToString(_tokenB),        ",",        Strings.toString(_orderId)    ),    signature,    signer);
+```
+
+### Internal Message Construction​
+
+Internally, the SignatureRecover.signatureVerification function constructs the final message by concatenating:
+
+```codeBlockLines_e6Vv
+string.concat(evvmID, ",", functionName, ",", inputs)
+```
+
+This results in a message format:
+
+```codeBlockLines_e6Vv
+"{evvmID},dispatchOrder,{nonce},{tokenA},{tokenB},{orderId}"
+```
+
+### EIP-191 Message Hashing​
+
+The message is then hashed according to EIP-191 standard:
+
+```codeBlockLines_e6Vv
+bytes32 messageHash = keccak256(    abi.encodePacked(        "\x19Ethereum Signed Message:\n",        Strings.toString(bytes(message).length),        message    ));
+```
+
+This creates the final hash that the user must sign with their private key.
+
+## Message Components​
+
+The signature verification takes three main parameters:
+
+1. EVVM ID (String):
+
+*   The result of `Strings.toString(evvmID)`
+*   _Purpose_: Identifies the specific EVVM instance
+
+2. Action Type (String):
+
+*   Fixed value: `"dispatchOrder"`
+*   _Purpose_: Identifies this as an order fulfillment operation
+
+3. Concatenated Parameters (String):
+The parameters are concatenated with comma separators:
+
+3.1. Nonce (String):
+
+*   The result of `Strings.toString(_nonce)`
+*   _Purpose_: Provides replay protection for the P2P Swap transaction
+
+3.2. Token A Address (String):
+
+*   The result of `AdvancedStrings.addressToString(_tokenA)`
+*   _Purpose_: Identifies the token offered in the target order
+
+3.3. Token B Address (String):
+
+*   The result of `AdvancedStrings.addressToString(_tokenB)`
+*   _Purpose_: Identifies the token requested in the target order
+
+3.4. Order ID (String):
+
+*   The result of `Strings.toString(_orderId)`
+*   _Purpose_: Specifies the unique ID of the order to be fulfilled
+
+## Example​
+
+Here's a practical example of constructing a signature message for fulfilling a swap order:
+
+Scenario: User wants to fulfill order #3 in the USDC/ETH market (buying 100 USDC for 0.05 ETH)
+
+Parameters:
+
+*   `evvmID`: `1` (EVVM instance ID)
+*   `_nonce`: `33`
+*   `_tokenA`: `0xA0b86a33E6441e6e80D0c4C6C7527d72E1d00000` (USDC - token being offered by seller)
+*   `_tokenB`: `0x0000000000000000000000000000000000000000` (ETH - token being requested by seller)
+*   `_orderId`: `3`
+
+Signature verification call:
+
+```codeBlockLines_e6Vv
+SignatureRecover.signatureVerification(    "1",  // evvmID as string    "dispatchOrder", // action type    "33,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,3",    signature,    signer);
+```
+
+Final message to be signed (after internal concatenation):
+
+```codeBlockLines_e6Vv
+1,dispatchOrder,33,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,3
+```
+
+EIP-191 formatted message hash:
+
+```codeBlockLines_e6Vv
+keccak256(abi.encodePacked(    "\x19Ethereum Signed Message:\n136",    "1,dispatchOrder,33,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,3"))
+```
+
+Concatenated parameters breakdown:
+
+1.  `33` - P2P Swap nonce for replay protection
+2.  `0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000` - USDC token address (tokenA from target order)
+3.  `0x0000000000000000000000000000000000000000` - ETH address (tokenB from target order)
+4.  `3` - Order ID to be fulfilled
+
+## Example with Reverse Token Pair​
+
+Scenario: User wants to fulfill order #12 in the ETH/USDC market (buying ETH with USDC)
+
+Parameters:
+
+*   `evvmID`: `1`
+*   `_nonce`: `55`
+*   `_tokenA`: `0x0000000000000000000000000000000000000000` (ETH - offered by seller)
+*   `_tokenB`: `0xA0b86a33E6441e6e80D0c4C6C7527d72E1d00000` (USDC - requested by seller)
+*   `_orderId`: `12`
+
+Final message to be signed:
+
+```codeBlockLines_e6Vv
+1,dispatchOrder,55,0x0000000000000000000000000000000000000000,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,12
+```
+
+Transaction Flow:
+
+*   Buyer provides USDC (tokenB) + fees
+*   Buyer receives ETH (tokenA) from the order
+*   Seller receives USDC payment + fee bonus
+
+## Usage in Both Dispatch Functions​
+
+This signature structure is used by both dispatch functions:
+
+### dispatchOrder_fillPropotionalFee​
+
+*   Uses the same signature verification
+*   Applies percentage-based fee calculation
+*   Distributes fees according to configured percentages
+
+### dispatchOrder_fillFixedFee​
+
+*   Uses identical signature verification
+*   Applies capped fee calculation with maximum limits
+*   Provides fee protection for large orders
+
+## Signature Implementation Details​
+
+The SignatureRecover library performs signature verification in the following steps:
+
+1.  **Message Construction**: Concatenates `evvmID`, `functionName`, and `inputs` with commas
+2.  **EIP-191 Formatting**: Prepends `"\x19Ethereum Signed Message:\n"` + message length
+3.  **Hashing**: Applies `keccak256` to the formatted message
+4.  **Signature Parsing**: Splits the 65-byte signature into `r`, `s`, and `v` components
+5.  **Recovery**: Uses `ecrecover` to recover the signer's address
+6.  **Verification**: Compares recovered address with expected signer
+
+### Signature Format Requirements​
+
+*   **Length**: Exactly 65 bytes
+*   **Structure**: `[r (32 bytes)][s (32 bytes)][v (1 byte)]`
+*   **V Value**: Must be 27 or 28 (automatically adjusted if < 27)
+
+## Security Considerations​
+
+### Order Validation​
+
+The signature authorizes the dispatch attempt, but the contract performs additional validation:
+
+1.  **Signature Verification**: Confirms the user signed the dispatch request
+2.  **Order Existence**: Verifies the order exists and is active
+3.  **Market Validation**: Confirms the token pair matches an existing market
+4.  **Nonce Validation**: Ensures the nonce hasn't been used before
+5.  **Payment Sufficiency**: Validates the user provided enough tokens to cover order + fees
+
+### Token Direction Understanding​
+
+The signature includes tokenA and tokenB from the seller's perspective:
+
+*   **tokenA**: What the seller is offering (buyer will receive)
+*   **tokenB**: What the seller wants (buyer must provide)
+*   **Order ID**: Identifies the specific order within the market
+
+### Fee Model Independence​
+
+The same signature works for both fee models:
+
+*   **Proportional Fee**: Percentage-based calculation
+*   **Fixed Fee**: Capped fee with maximum limits
+*   **Fee Choice**: Determined by which function is called, not the signature
+
+*   **Message Format**: The final message follows the pattern `"{evvmID},{functionName},{parameters}"`
+*   **EIP-191 Compliance**: Uses `"\x19Ethereum Signed Message:\n"` prefix with message length
+*   **Hash Function**: `keccak256` is used for the final message hash before signing
+*   **Signature Recovery**: Uses `ecrecover` to verify the signature against the expected signer
+*   **String Conversion**:
+    *   `AdvancedStrings.addressToString` converts addresses to lowercase hex with "0x" prefix
+    *   `Strings.toString` converts numbers to decimal strings
+*   **Universal Signature**: Same signature structure works for both proportional and fixed fee dispatch functions
+*   **Order Identification**: Token pair and order ID uniquely identify the target order
+*   **Buyer Authorization**: Signature proves the buyer authorizes the specific order fulfillment
+
+*   `AdvancedStrings.addressToString` converts addresses to lowercase hex with "0x" prefix
+*   `Strings.toString` converts numbers to decimal strings
+
+*   [Signed Message Format](#signed-message-format)
+    *   [Internal Message Construction](#internal-message-construction)
+    *   [EIP-191 Message Hashing](#eip-191-message-hashing)
+*   [Message Components](#message-components)
+*   [Example](#example)
+*   [Example with Reverse Token Pair](#example-with-reverse-token-pair)
+*   [Usage in Both Dispatch Functions](#usage-in-both-dispatch-functions)
+    *   [dispatchOrder\_fillPropotionalFee](#dispatchorder_fillpropotionalfee)
+    *   [dispatchOrder\_fillFixedFee](#dispatchorder_fillfixedfee)
+*   [Signature Implementation Details](#signature-implementation-details)
+    *   [Signature Format Requirements](#signature-format-requirements)
+*   [Security Considerations](#security-considerations)
+    *   [Order Validation](#order-validation)
+    *   [Token Direction Understanding](#token-direction-understanding)
+    *   [Fee Model Independence](#fee-model-independence)
+
+## Make Order Signature Structure
+[Permalink for this section](https://www.evvm.info/docs/SignatureStructures/P2PSwap/MakeOrderSignatureStructure)
+
+To authorize order creation operations, users must generate a cryptographic signature compliant with the EIP-191 standard using the Ethereum Signed Message format.
+
+The signature verification process uses the SignatureRecover library which implements the standard Ethereum message signing protocol. The message is constructed by concatenating the EVVM ID, action type, and parameters, then wrapped with the EIP-191 prefix: "\x19Ethereum Signed Message:\n" + message length + message content.
+
+## Signed Message Format​
+
+The signature verification uses the SignatureRecover.signatureVerification function with the following structure:
+
+```codeBlockLines_e6Vv
+SignatureRecover.signatureVerification(    Strings.toString(evvmID),        // EVVM ID as string    "makeOrder",                     // Action type    string.concat(                   // Concatenated parameters        Strings.toString(_nonce),        ",",        AdvancedStrings.addressToString(_tokenA),        ",",        AdvancedStrings.addressToString(_tokenB),        ",",        Strings.toString(_amountA),        ",",        Strings.toString(_amountB)    ),    signature,    signer);
+```
+
+### Internal Message Construction​
+
+Internally, the SignatureRecover.signatureVerification function constructs the final message by concatenating:
+
+```codeBlockLines_e6Vv
+string.concat(evvmID, ",", functionName, ",", inputs)
+```
+
+This results in a message format:
+
+```codeBlockLines_e6Vv
+"{evvmID},makeOrder,{nonce},{tokenA},{tokenB},{amountA},{amountB}"
+```
+
+### EIP-191 Message Hashing​
+
+The message is then hashed according to EIP-191 standard:
+
+```codeBlockLines_e6Vv
+bytes32 messageHash = keccak256(    abi.encodePacked(        "\x19Ethereum Signed Message:\n",        Strings.toString(bytes(message).length),        message    ));
+```
+
+This creates the final hash that the user must sign with their private key.
+
+## Message Components​
+
+The signature verification takes three main parameters:
+
+1. EVVM ID (String):
+
+*   The result of `Strings.toString(evvmID)`
+*   _Purpose_: Identifies the specific EVVM instance
+
+2. Action Type (String):
+
+*   Fixed value: `"makeOrder"`
+*   _Purpose_: Identifies this as an order creation operation
+
+3. Concatenated Parameters (String):
+The parameters are concatenated with comma separators:
+
+3.1. Nonce (String):
+
+*   The result of `Strings.toString(_nonce)`
+*   _Purpose_: Provides replay protection for the P2P Swap transaction
+
+3.2. Token A Address (String):
+
+*   The result of `AdvancedStrings.addressToString(_tokenA)`
+*   _Purpose_: Identifies the token being offered by the order creator
+
+3.3. Token B Address (String):
+
+*   The result of `AdvancedStrings.addressToString(_tokenB)`
+*   _Purpose_: Identifies the token being requested in exchange
+
+3.4. Amount A (String):
+
+*   The result of `Strings.toString(_amountA)`
+*   _Purpose_: Specifies the quantity of tokenA being offered
+
+3.5. Amount B (String):
+
+*   The result of `Strings.toString(_amountB)`
+*   _Purpose_: Specifies the quantity of tokenB being requested
+
+## Example​
+
+Here's a practical example of constructing a signature message for creating a swap order:
+
+Scenario: User wants to create an order offering 100 USDC for 0.05 ETH
+
+Parameters:
+
+*   `evvmID`: `1` (EVVM instance ID)
+*   `_nonce`: `15`
+*   `_tokenA`: `0xA0b86a33E6441e6e80D0c4C6C7527d72E1d00000` (USDC)
+*   `_tokenB`: `0x0000000000000000000000000000000000000000` (ETH)
+*   `_amountA`: `100000000` (100 USDC with 6 decimals)
+*   `_amountB`: `50000000000000000` (0.05 ETH in wei)
+
+Signature verification call:
+
+```codeBlockLines_e6Vv
+SignatureRecover.signatureVerification(    "1",  // evvmID as string    "makeOrder", // action type    "15,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,100000000,50000000000000000",    signature,    signer);
+```
+
+Final message to be signed (after internal concatenation):
+
+```codeBlockLines_e6Vv
+1,makeOrder,15,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,100000000,50000000000000000
+```
+
+EIP-191 formatted message hash:
+
+```codeBlockLines_e6Vv
+keccak256(abi.encodePacked(    "\x19Ethereum Signed Message:\n149",    "1,makeOrder,15,0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000,0x0000000000000000000000000000000000000000,100000000,50000000000000000"))
+```
+
+Concatenated parameters breakdown:
+
+1.  `15` - P2P Swap nonce for replay protection
+2.  `0xa0b86a33e6441e6e80d0c4c6c7527d72e1d00000` - USDC token address (tokenA)
+3.  `0x0000000000000000000000000000000000000000` - ETH address (tokenB)
+4.  `100000000` - Amount of USDC being offered (100 USDC with 6 decimals)
+5.  `50000000000000000` - Amount of ETH being requested (0.05 ETH in wei)
+
+## Signature Implementation Details​
+
+The SignatureRecover library performs signature verification in the following steps:
+
+1.  **Message Construction**: Concatenates `evvmID`, `functionName`, and `inputs` with commas
+2.  **EIP-191 Formatting**: Prepends `"\x19Ethereum Signed Message:\n"` + message length
+3.  **Hashing**: Applies `keccak256` to the formatted message
+4.  **Signature Parsing**: Splits the 65-byte signature into `r`, `s`, and `v` components
+5.  **Recovery**: Uses `ecrecover` to recover the signer's address
+6.  **Verification**: Compares recovered address with expected signer
+
+### Signature Format Requirements​
+
+*   **Length**: Exactly 65 bytes
+*   **Structure**: `[r (32 bytes)][s (32 bytes)][v (1 byte)]`
+*   **V Value**: Must be 27 or 28 (automatically adjusted if < 27)
+
+*   **Message Format**: The final message follows the pattern `"{evvmID},{functionName},{parameters}"`
+*   **EIP-191 Compliance**: Uses `"\x19Ethereum Signed Message:\n"` prefix with message length
+*   **Hash Function**: `keccak256` is used for the final message hash before signing
+*   **Signature Recovery**: Uses `ecrecover` to verify the signature against the expected signer
+*   **String Conversion**:
+    *   `AdvancedStrings.addressToString` converts addresses to lowercase hex with "0x" prefix
+    *   `Strings.toString` converts numbers to decimal strings
+*   **EVVM ID**: Identifies the specific EVVM instance for signature verification
+*   **Nonce Purpose**: P2P Swap specific nonce prevents replay attacks within the swap system
+
+*   `AdvancedStrings.addressToString` converts addresses to lowercase hex with "0x" prefix
+*   `Strings.toString` converts numbers to decimal strings
+
+*   [Signed Message Format](#signed-message-format)
+    *   [Internal Message Construction](#internal-message-construction)
+    *   [EIP-191 Message Hashing](#eip-191-message-hashing)
+*   [Message Components](#message-components)
+*   [Example](#example)
+*   [Signature Implementation Details](#signature-implementation-details)
+    *   [Signature Format Requirements](#signature-format-requirements)
