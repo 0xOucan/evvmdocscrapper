@@ -1,4 +1,4 @@
-<!-- Scraper Metadata: {"timestamp":"2025-11-06T22:43:07.595Z","pageCount":149,"pagesHash":"ea6c7b391bb1fbb2","eip191Included":true,"version":"2.0.0"} -->
+<!-- Scraper Metadata: {"timestamp":"2025-11-10T17:32:53.335Z","pageCount":149,"pagesHash":"ea6c7b391bb1fbb2","eip191Included":true,"version":"2.0.0"} -->
 # EVVM Documentation
 
 Complete documentation for EVVM (Ethereum Virtual Machine for Verifiable Computation). This file contains all documentation pages from https://www.evvm.info/docs/ concatenated for LLM context.
@@ -832,159 +832,9 @@ The result is a virtual blockchain that operates efficiently while maintaining e
 *   [Economic Model Summary](#economic-model-summary)
 
 ## ERC-191: Signed Data Standard
-[Permalink for this section](https://eips.ethereum.org/EIPS/eip-191)
+[Permalink for this section]()
 
-Authors
 
-Martin Holst Swende ([@holiman](https://github.com/holiman)), Nick Johnson <[arachnid@notdot.net](mailto:arachnid@notdot.net)\>
-
-Created
-
-2016-01-20
-
-## Table of Contents
-
-*   [Abstract](#abstract)
-*   [Motivation](#motivation)
-    *   [Specification](#specification)
-        *   [Registry of version bytes](#registry-of-version-bytes)
-        *   [Example](#example)
-    *   [Copyright](#copyright)
-
-*   [Specification](#specification)
-    *   [Registry of version bytes](#registry-of-version-bytes)
-    *   [Example](#example)
-*   [Copyright](#copyright)
-
-# Abstract
-
-This ERC proposes a specification about how to handle signed data in Ethereum contracts.
-
-# Motivation
-
-Several multisignature wallet implementations have been created which accepts presigned transactions. A presigned transaction is a chunk of binary signed_data, along with signature (r, s and v). The interpretation of the signed_data has not been specified, leading to several problems:
-
-*   Standard Ethereum transactions can be submitted as `signed_data`. An Ethereum transaction can be unpacked, into the following components: `RLP<nonce, gasPrice, startGas, to, value, data>` (hereby called `RLPdata`), `r`, `s` and `v`. If there are no syntactical constraints on `signed_data`, this means that `RLPdata` can be used as a syntactically valid `presigned` transaction.
-*   Multisignature wallets have also had the problem that a `presigned` transaction has not been tied to a particular `validator`, i.e a specific wallet. Example:
-    1.  Users `A`, `B` and `C` have the `2/3`\-wallet `X`
-    2.  Users `A`, `B` and `D` have the `2/3`\-wallet `Y`
-    3.  User `A` and `B` submit `presigned` transactions to `X`.
-    4.  Attacker can now reuse their presigned transactions to `X`, and submit to `Y`.
-
-1.  Users `A`, `B` and `C` have the `2/3`\-wallet `X`
-2.  Users `A`, `B` and `D` have the `2/3`\-wallet `Y`
-3.  User `A` and `B` submit `presigned` transactions to `X`.
-4.  Attacker can now reuse their presigned transactions to `X`, and submit to `Y`.
-
-## Specification
-
-We propose the following format for signed_data
-
-```
-0x19 <1 byte version> <version specific data> <data to sign>.
-
-```
-
-The initial 0x19 byte is intended to ensure that the signed_data is not valid RLP.
-
-For a single byte whose value is in the [0x00, 0x7f] range, that byte is its own RLP encoding.
-
-That means that any signed_data cannot be one RLP-structure, but a 1-byte RLP payload followed by something else. Thus, any EIP-191 signed_data can never be an Ethereum transaction.
-
-Additionally, 0x19 has been chosen because since ethereum/go-ethereum#2940 , the following is prepended before hashing in personal_sign:
-
-```
-"\x19Ethereum Signed Message:\n" + len(message).
-
-```
-
-Using 0x19 thus makes it possible to extend the scheme by defining a version 0x45 (E) to handle these kinds of signatures.
-
-### Registry of version bytes
-
-Version byte
-
-EIP
-
-Description
-
-`0x00`
-
-[191](/EIPS/eip-191)
-
-Data with intended validator
-
-`0x01`
-
-[712](/EIPS/eip-712)
-
-Structured data
-
-`0x45`
-
-[191](/EIPS/eip-191)
-
-`personal_sign` messages
-
-#### Version 0x00
-
-```
-0x19 <0x00> <intended validator address> <data to sign>
-
-```
-
-The version 0x00 has <intended validator address> for the version specific data. In the case of a Multisig wallet that perform an execution based on a passed signature, the validator address is the address of the Multisig itself. The data to sign could be any arbitrary data.
-
-#### Version 0x01
-
-The version 0x01 is for structured data as defined in EIP-712
-
-#### Version 0x45 (E)
-
-```
-0x19 <0x45 (E)> <thereum Signed Message:\n" + len(message)> <data to sign>
-
-```
-
-The version 0x45 (E) has <thereum Signed Message:\n" + len(message)> for the version-specific data. The data to sign can be any arbitrary data.
-
-NB: The E in Ethereum Signed Message refers to the version byte 0x45. The character E is 0x45 in hexadecimal which makes the remainder, thereum Signed Message:\n + len(message), the version-specific data.
-
-### Example
-
-The following snippets has been written in Solidity 0.8.0.
-
-#### Version 0x00
-
-```
-function signatureBasedExecution(address target, uint256 nonce, bytes memory payload, uint8 v, bytes32 r, bytes32 s) public payable {
-        
-    // Arguments when calculating hash to validate
-    // 1: byte(0x19) - the initial 0x19 byte
-    // 2: byte(0) - the version byte
-    // 3: address(this) - the validator address
-    // 4-6 : Application specific data
-
-    bytes32 hash = keccak256(abi.encodePacked(byte(0x19), byte(0), address(this), msg.value, nonce, payload));
-
-    // recovering the signer from the hash and the signature
-    addressRecovered = ecrecover(hash, v, r, s);
-   
-    // logic of the wallet
-    // if (addressRecovered == owner) executeOnTarget(target, payload);
-}
-
-```
-
-## Copyright
-
-Copyright and related rights waived via CC0.
-
-## Citation
-
-Please cite this document as:
-
-Martin Holst Swende (@holiman), Nick Johnson <arachnid@notdot.net>, "ERC-191: Signed Data Standard," Ethereum Improvement Proposals, no. 191, January 2016. [Online serial]. Available: https://eips.ethereum.org/EIPS/eip-191.
 
 ## EVVM Core Contract
 [Permalink for this section](https://www.evvm.info/docs/category/evvm-core-contract)
@@ -11001,21 +10851,23 @@ The Crosschain Treasury enables secure asset transfers between EVVM and external
 
 ## Architecture​
 
-The system uses two coordinated stations:
+The system uses two coordinated stations that communicate through multiple cross-chain protocols:
 
-### Host Chain Station​
+### Host Chain Station (TreasuryHostChainStation)​
 
 *   Operates on the same blockchain as EVVM
-*   Handles withdrawals from EVVM to external chains
-*   Receives deposits from external chains
-*   Manages EVVM balance updates
+*   Handles withdrawals from EVVM balances to external chains
+*   Receives Fisher bridge deposits from external chains
+*   Manages EVVM balance integration and updates
+*   Integrates with EVVM core contract for balance operations
 
-### External Chain Station​
+### External Chain Station (TreasuryExternalChainStation)​
 
 *   Deployed on external blockchains where user assets exist
-*   Handles deposits from users to EVVM
-*   Receives withdrawals from EVVM
-*   Manages real assets (tokens and native coins)
+*   Handles deposits from users to EVVM ecosystem
+*   Receives Fisher bridge withdrawals from EVVM
+*   Manages real asset custody (ERC20 tokens and native coins)
+*   Provides deposit interfaces for multiple asset types
 
 ## Supported Protocols​
 
@@ -11045,12 +10897,14 @@ Decentralized cross-chain network
 
 ## Fisher Bridge System​
 
-Advanced feature enabling gasless transactions:
+Advanced feature enabling gasless cross-chain transactions:
 
-*   **Gasless Operations**: Users don't need native tokens for gas
-*   **Signature Authorization**: Users sign messages to authorize transfers (see [Fisher Bridge Signature Structure](/docs/SignatureStructures/Treasury/FisherBridgeSignatureStructure))
-*   **Priority Fees**: Incentives for fisher executors
-*   **Authorized Executors**: Permissioned addresses that facilitate transfers
+*   **Gasless Operations**: Users don't need native tokens for gas on destination chains
+*   **EIP-191 Signature Authorization**: Users sign structured messages to authorize transfers
+*   **Priority Fees**: Economic incentives for Fisher executors who process transactions
+*   **Fisher Executor Control**: Permissioned addresses with `onlyFisherExecutor` modifier
+*   **Nonce-Based Security**: Replay attack prevention with sequential nonce tracking
+*   **EVVM ID Integration**: Cross-instance security through unique EVVM identifiers
 
 ## When to Use Crosschain Treasury​
 
@@ -11088,20 +10942,20 @@ The stations coordinate through cross-chain messaging to maintain synchronized a
 
 ### Host Chain Station Functions​
 
-*   **[withdraw](/docs/Treasury/TreasuryCrosschain/HostChainStation/withdraw)**: Withdraw assets from EVVM to external chains
-*   **[fisherBridgeReceive](/docs/Treasury/TreasuryCrosschain/HostChainStation/fisherBridgeReceive)**: Receive fisher-mediated deposits
-*   **[fisherBridgeSend](/docs/Treasury/TreasuryCrosschain/HostChainStation/fisherBridgeSend)**: Send fisher-mediated withdrawals
-*   **[setExternalChainAddress](/docs/Treasury/TreasuryCrosschain/HostChainStation/setExternalChainAddress)**: Configure external station addresses
-*   **[Admin Functions](/docs/Treasury/TreasuryCrosschain/HostChainStation/AdminFunctions)**: Management and governance functions
+*   **[withdraw](/docs/Treasury/TreasuryCrosschain/HostChainStation/withdraw)**: Withdraw assets from EVVM to external chains via cross-chain protocols
+*   **[fisherBridgeReceive](/docs/Treasury/TreasuryCrosschain/HostChainStation/fisherBridgeReceive)**: Receive Fisher bridge deposits and credit EVVM balances
+*   **[fisherBridgeSend](/docs/Treasury/TreasuryCrosschain/HostChainStation/fisherBridgeSend)**: Process Fisher bridge withdrawals with signature verification
+*   **[setExternalChainAddress](/docs/Treasury/TreasuryCrosschain/HostChainStation/setExternalChainAddress)**: One-time setup of external station addresses
+*   **[Admin Functions](/docs/Treasury/TreasuryCrosschain/HostChainStation/AdminFunctions)**: Time-delayed governance and executor management
 
 ### External Chain Station Functions​
 
-*   **[depositERC20](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/depositERC20)**: Deposit ERC20 tokens to EVVM
-*   **[depositCoin](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/depositCoin)**: Deposit native coins to EVVM
-*   **[fisherBridgeReceive](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/fisherBridgeReceive)**: Receive fisher-mediated transactions
-*   **[fisherBridgeSendERC20](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/fisherBridgeSendERC20)**: Send ERC20 via fisher bridge
-*   **[fisherBridgeSendCoin](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/fisherBridgeSendCoin)**: Send native coins via fisher bridge
-*   **[Admin Functions](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/AdminFunctions)**: Management and governance functions
+*   **[depositERC20](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/depositERC20)**: Deposit ERC20 tokens and send to EVVM via cross-chain protocols
+*   **[depositCoin](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/depositCoin)**: Deposit native coins and send to EVVM via cross-chain protocols
+*   **[fisherBridgeReceive](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/fisherBridgeReceive)**: Receive Fisher bridge transactions (validation only)
+*   **[fisherBridgeSendERC20](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/fisherBridgeSendERC20)**: Process Fisher bridge ERC20 transfers to host chain
+*   **[fisherBridgeSendCoin](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/fisherBridgeSendCoin)**: Process Fisher bridge native coin transfers to host chain
+*   **[Admin Functions](/docs/Treasury/TreasuryCrosschain/ExternalChainStation/AdminFunctions)**: Time-delayed governance and system configuration
 
 ### Supporting Libraries​
 
@@ -11111,11 +10965,14 @@ The Treasury Crosschain system implements standardized error handling and data s
 
 ## Security Features​
 
-*   Principal token withdrawals are blocked to protect ecosystem integrity
-*   All cross-chain messages require proper authorization verification
-*   Fisher bridge operations use cryptographic signatures for user consent (see [Fisher Bridge Signature Structure](/docs/SignatureStructures/Treasury/FisherBridgeSignatureStructure))
-*   Time-delayed governance for administrative changes (1-day delay)
-*   Protocol-specific validation for each supported interoperability solution
+*   **Principal Token Protection**: Principal token (MATE) withdrawals blocked via `PrincipalTokenIsNotWithdrawable` error
+*   **Cross-Chain Authorization**: All messages require sender and chain ID validation
+*   **Fisher Bridge Signatures**: EIP-191 compliant signatures with structured message format
+*   **Nonce-Based Protection**: Sequential nonce tracking prevents replay attacks
+*   **Time-Delayed Governance**: 1-day delays for admin and Fisher executor changes
+*   **Access Control**: `onlyAdmin` and `onlyFisherExecutor` modifiers restrict critical functions
+*   **Protocol Validation**: Chain-specific authorization for Hyperlane, LayerZero, and Axelar
+*   **Balance Verification**: Insufficient balance checks with `InsufficientBalance` error protection
 
 ## Gas Management​
 
@@ -11128,14 +10985,14 @@ Each protocol requires different gas payment mechanisms:
 Users must provide sufficient native tokens to cover cross-chain transaction costs when initiating transfers.
 
 *   [Architecture](#architecture)
-    *   [Host Chain Station](#host-chain-station)
-    *   [External Chain Station](#external-chain-station)
+    *   [Host Chain Station (TreasuryHostChainStation)](#host-chain-station-treasuryhostchainstation)
+    *   [External Chain Station (TreasuryExternalChainStation)](#external-chain-station-treasuryexternalchainstation)
 *   [Supported Protocols](#supported-protocols)
 *   [Fisher Bridge System](#fisher-bridge-system)
 *   [When to Use Crosschain Treasury](#when-to-use-crosschain-treasury)
 *   [Available Functions](#available-functions)
-    *   [Host Chain Station](#host-chain-station-1)
-    *   [External Chain Station](#external-chain-station-1)
+    *   [Host Chain Station](#host-chain-station)
+    *   [External Chain Station](#external-chain-station)
 *   [Cross-Chain Flow](#cross-chain-flow)
 *   [Available Functions](#available-functions-1)
     *   [Host Chain Station Functions](#host-chain-station-functions)
@@ -11144,6 +11001,9 @@ Users must provide sufficient native tokens to cover cross-chain transaction cos
 *   [Security Features](#security-features)
 *   [Gas Management](#gas-management)
 
+*   [Host Chain Station (TreasuryHostChainStation)](#host-chain-station-treasuryhostchainstation)
+*   [External Chain Station (TreasuryExternalChainStation)](#external-chain-station-treasuryexternalchainstation)
+
 ## withdraw
 [Permalink for this section](https://www.evvm.info/docs/Treasury/TreasuryCrosschain/HostChainStation/withdraw)
 
@@ -11151,7 +11011,7 @@ Function Type: external payable
 Function Signature: withdraw(address,address,uint256,bytes1)
 Returns: void
 
-Withdraws assets from the EVVM virtual blockchain to an external blockchain through cross-chain protocols. This function debits the user's EVVM balance and initiates a cross-chain transfer to the specified recipient on the external chain.
+Withdraws tokens from EVVM balance and sends them to external chain via selected cross-chain protocol. This function validates balance, deducts from EVVM, and bridges via Hyperlane, LayerZero, or Axelar protocols.
 
 ## Parameters​
 
@@ -11215,55 +11075,61 @@ Uses Axelar gateway for decentralized cross-chain communication
 
 ### Initial Validations​
 
-1.  **Principal Token Protection**: Verifies the token is not the ecosystem's principal token using `getEvvmMetadata().principalTokenAddress`. Reverts with `PrincipalTokenIsNotWithdrawable` if attempting to withdraw principal token.
-2.  **Balance Verification**: Ensures user has sufficient balance in EVVM using `getBalance(msg.sender, token) < amount`. Reverts with `InsufficientBalance` if insufficient funds.
-3.  **EVVM Balance Debit**: Calls `removeAmountFromUser(msg.sender, token, amount)` to deduct amount from user's EVVM balance.
+1.  **Principal Token Protection**: Validates token is not the Principal Token (MATE) using `Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress`. Reverts with `ErrorsLib.PrincipalTokenIsNotWithdrawable()` if attempted.
+2.  **Balance Verification**: Confirms user has sufficient EVVM balance using `Evvm(evvmAddress).getBalance(msg.sender, token)`. Reverts with `ErrorsLib.InsufficientBalance()` if insufficient.
+3.  **EVVM Balance Deduction**: Calls `Evvm(evvmAddress).removeAmountFromUser(msg.sender, token, amount)` to deduct from user's virtual balance.
 
 ### Protocol-Specific Execution​
 
 #### Hyperlane (0x01)​
 
 ```codeBlockLines_e6Vv
-uint256 quote = getQuoteHyperlane(toAddress, token, amount);IMailbox(hyperlane.mailboxAddress).dispatch{value: quote}(    hyperlane.externalChainStationDomainId,    hyperlane.externalChainStationAddress,    payload);
+bytes memory payload = PayloadUtils.encodePayload(token, toAddress, amount);uint256 quote = IMailbox(hyperlane.mailboxAddress).quoteDispatch(    hyperlane.externalChainStationDomainId,    hyperlane.externalChainStationAddress,    payload);IMailbox(hyperlane.mailboxAddress).dispatch{value: quote}(    hyperlane.externalChainStationDomainId,    hyperlane.externalChainStationAddress,    payload);
 ```
 
-*   **Gas Estimation**: Calls `getQuoteHyperlane()` to estimate required native tokens
-*   **Message Dispatch**: Sends encoded payload to external chain station via Hyperlane mailbox
-*   **Native Payment**: `msg.value` must cover the quoted gas fee
+*   **Payload Encoding**: Uses `PayloadUtils.encodePayload()` for standardized message format
+*   **Quote Calculation**: Gets exact dispatch cost via `IMailbox.quoteDispatch()`
+*   **Message Dispatch**: Sends to external station via Hyperlane mailbox with proper gas payment
 
 #### LayerZero (0x02)​
 
 ```codeBlockLines_e6Vv
-uint256 fee = quoteLayerZero(toAddress, token, amount);_lzSend(    layerZero.externalChainStationEid,    payload,    _options,    MessagingFee(fee, 0),    msg.sender);
+bytes memory payload = PayloadUtils.encodePayload(token, toAddress, amount);MessagingFee memory fee = _quote(    layerZero.externalChainStationEid,    payload,    options,    false);_lzSend(    layerZero.externalChainStationEid,    payload,    options,    MessagingFee(fee.nativeFee, 0),    msg.sender);
 ```
 
-*   **Fee Calculation**: Estimates LayerZero messaging fees
-*   **Omnichain Send**: Uses LayerZero's `_lzSend` with predefined options
-*   **Refund Address**: Excess fees refunded to `msg.sender`
+*   **Payload Encoding**: Uses `PayloadUtils.encodePayload()` for consistent data structure
+*   **Fee Quotation**: Calculates exact messaging fee via `_quote()` function
+*   **Omnichain Send**: Dispatches via LayerZero V2 endpoint with proper fee handling
 
 #### Axelar (0x03)​
 
 ```codeBlockLines_e6Vv
-IAxelarGasService(axelar.gasServiceAddress).payNativeGasForContractCall{    value: msg.value}(    address(this),    axelar.externalChainStationChainName,    axelar.externalChainStationAddress,    payload,    msg.sender);gateway().callContract(    axelar.externalChainStationChainName,    axelar.externalChainStationAddress,    payload);
+bytes memory payload = PayloadUtils.encodePayload(token, toAddress, amount);IAxelarGasService(axelar.gasServiceAddress).payNativeGasForContractCall{    value: msg.value}(    address(this),    axelar.externalChainStationChainName,    axelar.externalChainStationAddress,    payload,    msg.sender);gateway().callContract(    axelar.externalChainStationChainName,    axelar.externalChainStationAddress,    payload);
 ```
 
-*   **Gas Service Payment**: Pays native tokens to Axelar gas service
-*   **Gateway Call**: Initiates cross-chain contract call through Axelar gateway
-*   **Refund Recipient**: Gas refunds directed to `msg.sender`
+*   **Payload Encoding**: Uses `PayloadUtils.encodePayload()` for cross-chain compatibility
+*   **Gas Service Payment**: Prepays execution gas to Axelar gas service contract
+*   **Gateway Dispatch**: Routes message through Axelar gateway with refund to sender
 
 ## Payload Encoding​
 
-The function encodes transfer data as:
+The function uses standardized payload encoding via PayloadUtils library:
 
 ```codeBlockLines_e6Vv
-bytes memory payload = abi.encode(token, toAddress, amount);
+bytes memory payload = PayloadUtils.encodePayload(token, toAddress, amount);
 ```
 
-This payload is decoded on the external chain station to:
+This creates a consistent format decoded on external chain station using:
 
-1.  Identify the token type
-2.  Determine the recipient address
-3.  Process the transfer amount
+```codeBlockLines_e6Vv
+(address token, address toAddress, uint256 amount) = PayloadUtils.decodePayload(payload);
+```
+
+The payload structure ensures:
+
+1.  **Token identification**: ERC20 contract address or `address(0)` for native coins
+2.  **Recipient specification**: Exact recipient address on external chain
+3.  **Amount precision**: Token amount in native decimals
 
 ## Gas Requirements​
 
@@ -11277,18 +11143,20 @@ The transaction will revert if insufficient native tokens are provided to cover 
 
 ## Security Features​
 
-*   **Authorization**: Only token holders can withdraw their own balances
-*   **Principal Token Protection**: Prevents withdrawal of ecosystem's core token
-*   **Balance Verification**: Ensures sufficient EVVM balance before processing
-*   **Protocol Validation**: Reverts for unsupported protocol identifiers
+*   **User Authorization**: Only holders can withdraw from their own EVVM balances
+*   **Principal Token Protection**: `ErrorsLib.PrincipalTokenIsNotWithdrawable()` prevents MATE token withdrawal
+*   **Balance Verification**: `ErrorsLib.InsufficientBalance()` protection with EVVM balance checks
+*   **Protocol Validation**: Reverts for invalid protocol identifiers
+*   **Cross-Chain Security**: Each protocol validates sender authorization on message receipt
 
 ## External Chain Processing​
 
-Upon successful cross-chain message delivery, the external chain station will:
+Upon successful cross-chain message delivery, the External Chain Station:
 
-1.  Decode the payload to extract transfer details
-2.  Transfer the corresponding assets to the specified recipient
-3.  Handle both native coins and ERC20 tokens appropriately
+1.  **Message Validation**: Verifies sender authorization and chain ID
+2.  **Payload Decoding**: Uses `PayloadUtils.decodePayload()` to extract transfer details
+3.  **Asset Transfer**: Transfers ERC20 tokens or native coins to recipient
+4.  **Event Emission**: Logs successful cross-chain transfer for tracking
 
 *   [Parameters](#parameters)
 *   [Protocol Identifiers](#protocol-identifiers)
@@ -11308,7 +11176,7 @@ Function Signature: fisherBridgeReceive(address,address,address,uint256,uint256,
 Access Control: onlyFisherExecutor
 Returns: void
 
-Processes incoming cross-chain deposits mediated by authorized fisher executors. This function validates cryptographic signatures from users and credits their EVVM balances accordingly, enabling gasless deposits through the fisher bridge system.
+Receives Fisher bridge transactions from external chain and credits EVVM balances. Verifies EIP-191 signature, increments nonce, and adds balance to recipient and executor for priority fees.
 
 ## Parameters​
 
@@ -11367,36 +11235,36 @@ modifier onlyFisherExecutor() {    if (msg.sender != fisherExecutor.current) {  
 ### 1. Signature Verification​
 
 ```codeBlockLines_e6Vv
-if (!SignatureUtils.verifyMessageSignedForFisherBridge(    from,    addressToReceive,    nextFisherExecutionNonce[from],    tokenAddress,    priorityFee,    amount,    signature)) revert ErrorsLib.InvalidSignature();
+if (!SignatureUtils.verifyMessageSignedForFisherBridge(    EVVM_ID,    from,    addressToReceive,    nextFisherExecutionNonce[from],    tokenAddress,    priorityFee,    amount,    signature)) revert ErrorsLib.InvalidSignature();
 ```
 
-Validates that the signature was created by the from address using the Fisher Bridge signature format. For complete signature requirements and verification process, see the Fisher Bridge Signature Structure documentation.
+Validates EIP-191 signature using structured message format with EVVM ID integration. Message format: "{EVVM_ID},fisherBridge,{addressToReceive},{nonce},{tokenAddress},{priorityFee},{amount}".
 
-### 2. Nonce Increment​
+### 2. Nonce Management​
 
 ```codeBlockLines_e6Vv
 nextFisherExecutionNonce[from]++;
 ```
 
-Increments the user's nonce to prevent replay attacks.
+Increments user's Fisher bridge nonce to prevent replay attacks across cross-chain operations.
 
-### 3. Balance Credits​
+### 3. EVVM Balance Updates​
 
-#### Recipient Balance Credit​
-
-```codeBlockLines_e6Vv
-executerEVVM(true, addressToReceive, tokenAddress, amount);
-```
-
-Credits the specified amount to the recipient's EVVM balance.
-
-#### Fisher Fee Payment (if applicable)​
+#### Recipient Credit​
 
 ```codeBlockLines_e6Vv
-if (priorityFee > 0)    executerEVVM(true, msg.sender, tokenAddress, priorityFee);
+Evvm(evvmAddress).addAmountToUser(addressToReceive, tokenAddress, amount);
 ```
 
-If a priority fee is specified, credits it to the fisher executor's EVVM balance.
+Adds the transfer amount to recipient's EVVM balance via core contract integration.
+
+#### Fisher Executor Fee​
+
+```codeBlockLines_e6Vv
+if (priorityFee > 0) {    Evvm(evvmAddress).addAmountToUser(msg.sender, tokenAddress, priorityFee);}
+```
+
+Credits priority fee to Fisher executor's EVVM balance as processing incentive.
 
 ## Signature Message Format​
 
@@ -11404,87 +11272,48 @@ For more information about the signature structure, refer to the Fisher Bridge S
 
 ## EVVM Integration​
 
-The function uses the internal executerEVVM helper to interact with the EVVM core contract:
+The function directly integrates with the EVVM core contract for balance management:
 
 ```codeBlockLines_e6Vv
-function executerEVVM(    bool typeOfExecution,    address userToExecute,    address token,    uint256 amount) internal {    if (typeOfExecution) {        // true = add        Evvm(evvmAddress).addAmountToUser(userToExecute, token, amount);    } else {        // false = remove        Evvm(evvmAddress).removeAmountFromUser(userToExecute, token, amount);    }}
+Evvm(evvmAddress).addAmountToUser(addressToReceive, tokenAddress, amount);
 ```
 
-## Fisher Bridge Benefits​
+This provides:
 
-### For Users​
-
-*   **Gasless Transactions**: Users don't need native tokens on the host chain
-*   **Flexible Recipients**: Can specify different recipient addresses
-*   **Signature-based Authorization**: Secure consent without direct interaction
-
-### For Fisher Executors​
-
-*   **Priority Fees**: Earn fees for facilitating transfers
-*   **Batch Processing**: Can process multiple transfers efficiently
-*   **Automated Operations**: Enable programmatic cross-chain services
+*   **Direct Balance Credit**: Adds tokens to user's EVVM virtual balance
+*   **Token Type Support**: Handles both ERC20 tokens and native ETH (address(0))
+*   **Atomic Operations**: Ensures consistent state between Treasury and EVVM core
+*   **Fee Distribution**: Separates user funds from Fisher executor incentives
 
 ## Security Features​
 
-### Signature Security​
+*   **Fisher Executor Authorization**: `onlyFisherExecutor` modifier restricts function access
+*   **EIP-191 Signature Verification**: Structured message format with EVVM ID binding
+*   **Nonce-Based Replay Protection**: Sequential nonce tracking per user address
+*   **EVVM ID Integration**: Cross-instance security through unique identifiers
+*   **Balance Segregation**: Separate handling of transfer amount and priority fees
 
-*   **EIP-191 Standard**: Uses Ethereum's signed message standard (see [signature format](/docs/SignatureStructures/Treasury/FisherBridgeSignatureStructure))
-*   **Replay Protection**: Nonce-based prevention of signature reuse
-*   **Address Binding**: Signature tied to specific sender address
+## Cross-Chain Flow​
 
-### Access Control​
+1.  **External Chain**: User initiates Fisher bridge transaction with signature
+2.  **Fisher Monitoring**: Fisher executor captures transaction from external station
+3.  **Host Chain Processing**: This function validates and credits EVVM balances
+4.  **Balance Availability**: Tokens immediately available in user's EVVM account } }
 
-*   **Fisher Authorization**: Only authorized executors can call the function
-*   **Signature Validation**: Cryptographic proof of user consent required (see [signature format](/docs/SignatureStructures/Treasury/FisherBridgeSignatureStructure))
-
-### Balance Management​
-
-*   **Direct EVVM Integration**: Secure balance updates through authorized treasury functions
-*   **Atomic Operations**: Balance credits are processed atomically
-
-## Error Conditions​
-
-Error
-
-Condition
-
-`InvalidSignature`
-
-Signature verification fails
-
-Access Control Revert
-
-Called by unauthorized address (not current fisher executor)
-
-## Usage Example​
-
-A typical fisher bridge receive flow:
-
-1.  User signs a message on external chain authorizing the transfer
-2.  Fisher executor receives the signature and transfer details
-3.  Fisher calls `fisherBridgeReceive` with the signature and transfer parameters
-4.  Function validates signature and credits EVVM balances
-5.  User receives tokens in EVVM, fisher receives priority fee (if applicable)
-
-Fisher executors are managed through a time-delayed governance system. See Admin Functions for details on executor management.
+```codeBlockLines_e6Vv
+## Fisher Bridge Benefits### For Users- **Gasless Transactions**: Users don't need native tokens on the host chain- **Flexible Recipients**: Can specify different recipient addresses- **Signature-based Authorization**: Secure consent without direct interaction### For Fisher Executors- **Priority Fees**: Earn fees for facilitating transfers- **Batch Processing**: Can process multiple transfers efficiently- **Automated Operations**: Enable programmatic cross-chain services## Security Features### Signature Security- **EIP-191 Standard**: Uses Ethereum's signed message standard (see [signature format](../../../09-SignatureStructures/04-Treasury/01-FisherBridgeSignatureStructure.md))- **Replay Protection**: Nonce-based prevention of signature reuse- **Address Binding**: Signature tied to specific sender address### Access Control- **Fisher Authorization**: Only authorized executors can call the function- **Signature Validation**: Cryptographic proof of user consent required (see [signature format](../../../09-SignatureStructures/04-Treasury/01-FisherBridgeSignatureStructure.md))### Balance Management- **Direct EVVM Integration**: Secure balance updates through authorized treasury functions- **Atomic Operations**: Balance credits are processed atomically## Error Conditions| Error | Condition ||-------|-----------|| `InvalidSignature` | Signature verification fails || Access Control Revert | Called by unauthorized address (not current fisher executor) |## Usage ExampleA typical fisher bridge receive flow:1. User signs a message on external chain authorizing the transfer2. Fisher executor receives the signature and transfer details3. Fisher calls `fisherBridgeReceive` with the signature and transfer parameters4. Function validates signature and credits EVVM balances5. User receives tokens in EVVM, fisher receives priority fee (if applicable):::info[Fisher Executor Management]Fisher executors are managed through a time-delayed governance system. See [Admin Functions](./05-AdminFunctions.md) for details on executor management.:::
+```
 
 *   [Parameters](#parameters)
 *   [Access Control](#access-control)
 *   [Workflow](#workflow)
     *   [1\. Signature Verification](#1-signature-verification)
-    *   [2\. Nonce Increment](#2-nonce-increment)
-    *   [3\. Balance Credits](#3-balance-credits)
+    *   [2\. Nonce Management](#2-nonce-management)
+    *   [3\. EVVM Balance Updates](#3-evvm-balance-updates)
 *   [Signature Message Format](#signature-message-format)
 *   [EVVM Integration](#evvm-integration)
-*   [Fisher Bridge Benefits](#fisher-bridge-benefits)
-    *   [For Users](#for-users)
-    *   [For Fisher Executors](#for-fisher-executors)
 *   [Security Features](#security-features)
-    *   [Signature Security](#signature-security)
-    *   [Access Control](#access-control-1)
-    *   [Balance Management](#balance-management)
-*   [Error Conditions](#error-conditions)
-*   [Usage Example](#usage-example)
+*   [Cross-Chain Flow](#cross-chain-flow)
 
 ## fisherBridgeSend
 [Permalink for this section](https://www.evvm.info/docs/Treasury/TreasuryCrosschain/HostChainStation/fisherBridgeSend)
@@ -11494,7 +11323,7 @@ Function Signature: fisherBridgeSend(address,address,address,uint256,uint256,byt
 Access Control: onlyFisherExecutor
 Returns: void
 
-Facilitates cross-chain withdrawals through the fisher bridge system by validating user signatures and emitting events for external chain processing. This function enables gasless withdrawals where authorized fisher executors can initiate transfers on behalf of users.
+Processes Fisher bridge token transfers from host to external chain. Validates balance and signature, deducts from sender, pays executor fee, and emits event for external chain processing.
 
 ## Parameters​
 
@@ -11550,60 +11379,60 @@ Only addresses with the current fisherExecutor role can call this function.
 
 ## Workflow​
 
-### 1. Principal Token Validation​
+### 1. Principal Token Protection​
 
 ```codeBlockLines_e6Vv
 if (tokenAddress == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress)    revert ErrorsLib.PrincipalTokenIsNotWithdrawable();
 ```
 
-Prevents withdrawal of the ecosystem's principal token to maintain system integrity.
+Prevents withdrawal of Principal Token (MATE) to protect ecosystem integrity.
 
-### 2. Balance Verification​
+### 2. Balance Validation​
 
 ```codeBlockLines_e6Vv
-if (Evvm(evvmAddress).getBalance(from, tokenAddress) < amount)    revert ErrorsLib.InsufficientBalance();
+if (Evvm(evvmAddress).getBalance(from, tokenAddress) < (amount + priorityFee))    revert ErrorsLib.InsufficientBalance();
 ```
 
-Ensures the user has sufficient EVVM balance before processing the withdrawal.
+Verifies user has sufficient EVVM balance to cover both withdrawal amount and priority fee.
 
 ### 3. Signature Verification​
 
 ```codeBlockLines_e6Vv
-if (!SignatureUtils.verifyMessageSignedForFisherBridge(    from,    addressToReceive,    nextFisherExecutionNonce[from],    tokenAddress,    priorityFee,    amount,    signature)) revert ErrorsLib.InvalidSignature();
+if (!SignatureUtils.verifyMessageSignedForFisherBridge(    EVVM_ID,    from,    addressToReceive,    nextFisherExecutionNonce[from],    tokenAddress,    priorityFee,    amount,    signature)) revert ErrorsLib.InvalidSignature();
 ```
 
-For more information about the signature structure, refer to the Fisher Bridge Signature Structure.
+Validates EIP-191 signature with EVVM ID integration and structured message format.
 
-### 4. Nonce Management​
+### 4. Nonce Increment​
 
 ```codeBlockLines_e6Vv
 nextFisherExecutionNonce[from]++;
 ```
 
-Increments the user's execution nonce to prevent replay attacks.
+Increments Fisher bridge nonce for replay attack prevention.
 
-### 5. Balance Updates​
+### 5. EVVM Balance Operations​
 
-#### User Balance Debit​
-
-```codeBlockLines_e6Vv
-executerEVVM(false, from, tokenAddress, amount + priorityFee);
-```
-
-Removes the total amount (withdrawal + priority fee) from the user's EVVM balance.
-
-#### Fisher Fee Credit​
+#### User Balance Deduction​
 
 ```codeBlockLines_e6Vv
-if (priorityFee > 0)    executerEVVM(true, msg.sender, tokenAddress, priorityFee);
+Evvm(evvmAddress).removeAmountFromUser(from, tokenAddress, amount + priorityFee);
 ```
 
-Credits the priority fee to the fisher executor's EVVM balance if specified.
+Deducts total amount (transfer + fee) from user's EVVM balance.
+
+#### Fisher Executor Fee​
+
+```codeBlockLines_e6Vv
+if (priorityFee > 0) {    Evvm(evvmAddress).addAmountToUser(msg.sender, tokenAddress, priorityFee);}
+```
+
+Credits priority fee to Fisher executor's EVVM balance as processing incentive.
 
 ### 6. Event Emission​
 
 ```codeBlockLines_e6Vv
-emit FisherBridgeSend(    from,    addressToReceive,    tokenAddress,    priorityFee,    amount,    nextFisherExecutionNonce[from] - 1);
+emit FisherBridgeSend(    from,    addressToReceive,    tokenAddress,    priorityFee,    amount,    nextFisherExecutionNonce[from] - 1    amount,    nextFisherExecutionNonce[from] - 1);
 ```
 
 Emits an event containing all transfer details for external chain monitoring and processing.
@@ -11696,11 +11525,11 @@ This function only updates EVVM balances and emits events. The actual token tran
 *   [Parameters](#parameters)
 *   [Access Control](#access-control)
 *   [Workflow](#workflow)
-    *   [1\. Principal Token Validation](#1-principal-token-validation)
-    *   [2\. Balance Verification](#2-balance-verification)
+    *   [1\. Principal Token Protection](#1-principal-token-protection)
+    *   [2\. Balance Validation](#2-balance-validation)
     *   [3\. Signature Verification](#3-signature-verification)
-    *   [4\. Nonce Management](#4-nonce-management)
-    *   [5\. Balance Updates](#5-balance-updates)
+    *   [4\. Nonce Increment](#4-nonce-increment)
+    *   [5\. EVVM Balance Operations](#5-evvm-balance-operations)
     *   [6\. Event Emission](#6-event-emission)
 *   [Event Definition](#event-definition)
     *   [Event Parameters](#event-parameters)
@@ -12179,7 +12008,7 @@ Function Type: external payable
 Function Signature: depositERC20(address,address,uint256,bytes1)
 Returns: void
 
-Deposits ERC20 tokens from the external chain to EVVM through cross-chain protocols. This function transfers tokens from the user's wallet on the external chain and sends a cross-chain message to credit the recipient's EVVM balance.
+Deposits ERC20 tokens and sends them to host chain via selected cross-chain protocol. Supports Hyperlane, LayerZero, and Axelar protocols for reliable token bridging to EVVM ecosystem.
 
 ## Parameters​
 
@@ -12241,47 +12070,51 @@ Uses Axelar gateway for decentralized cross-chain communication
 
 ## Workflow​
 
-### 1. Payload Encoding​
+### 1. Input Validation​
 
 ```codeBlockLines_e6Vv
-bytes memory payload = encodePayload(token, toAddress, amount);
+if (amount == 0) revert ErrorsLib.DepositAmountMustBeGreaterThanZero();
 ```
 
-Encodes the deposit information for cross-chain transmission.
+Ensures meaningful deposit amounts and prevents zero-value transactions.
 
-### 2. Token Transfer Verification​
+### 2. Token Transfer​
 
 ```codeBlockLines_e6Vv
-verifyAndDepositERC20(token, amount);
+SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), amount);
 ```
 
-Internal function that:
+Safely transfers ERC20 tokens from user to contract using Solady's SafeTransferLib for gas optimization and security.
 
-*   Validates `token != address(0)`
-*   Checks sufficient allowance: `IERC20(token).allowance(msg.sender, address(this)) >= amount`
-*   Transfers tokens: `IERC20(token).transferFrom(msg.sender, address(this), amount)`
+### 3. Payload Encoding​
+
+```codeBlockLines_e6Vv
+bytes memory payload = PayloadUtils.encodePayload(token, toAddress, amount);
+```
+
+Creates standardized cross-chain message payload using PayloadUtils library.
 
 ### 3. Protocol-Specific Cross-Chain Execution​
 
 #### Hyperlane (0x01)​
 
 ```codeBlockLines_e6Vv
-uint256 quote = getQuoteHyperlane(toAddress, token, amount);IMailbox(hyperlane.mailboxAddress).dispatch{value: quote}(    hyperlane.hostChainStationDomainId,    hyperlane.hostChainStationAddress,    payload);
+uint256 quote = IMailbox(hyperlane.mailboxAddress).quoteDispatch(    hyperlane.hostChainStationDomainId,    hyperlane.hostChainStationAddress,    payload);IMailbox(hyperlane.mailboxAddress).dispatch{value: quote}(    hyperlane.hostChainStationDomainId,    hyperlane.hostChainStationAddress,    payload);
 ```
 
-*   **Gas Estimation**: Calls `getQuoteHyperlane()` for required native tokens
-*   **Message Dispatch**: Sends payload to host chain station via Hyperlane
-*   **Payment**: `msg.value` must cover the quoted dispatch fee
+*   **Quote Calculation**: Gets exact dispatch cost from Hyperlane mailbox
+*   **Message Dispatch**: Sends encoded payload to host chain station
+*   **Gas Payment**: Uses quoted amount for precise fee payment
 
 #### LayerZero (0x02)​
 
 ```codeBlockLines_e6Vv
-uint256 fee = quoteLayerZero(toAddress, token, amount);_lzSend(    layerZero.hostChainStationEid,    payload,    _options,    MessagingFee(fee, 0),    msg.sender);
+MessagingFee memory fee = _quote(    layerZero.hostChainStationEid,    payload,    options,    false);_lzSend(    layerZero.hostChainStationEid,    payload,    options,    MessagingFee(fee.nativeFee, 0),    msg.sender);
 ```
 
-*   **Fee Calculation**: Estimates LayerZero messaging fees
-*   **Omnichain Send**: Uses LayerZero's OApp framework
-*   **Refund**: Excess fees refunded to `msg.sender`
+*   **Fee Quotation**: Calculates exact LayerZero messaging costs
+*   **Omnichain Send**: Utilizes LayerZero V2 OApp framework
+*   **Refund Handling**: Excess fees automatically refunded to sender
 
 #### Axelar (0x03)​
 
@@ -12289,43 +12122,41 @@ uint256 fee = quoteLayerZero(toAddress, token, amount);_lzSend(    layerZero.hos
 IAxelarGasService(axelar.gasServiceAddress).payNativeGasForContractCall{    value: msg.value}(    address(this),    axelar.hostChainStationChainName,    axelar.hostChainStationAddress,    payload,    msg.sender);gateway().callContract(    axelar.hostChainStationChainName,    axelar.hostChainStationAddress,    payload);
 ```
 
-*   **Gas Service**: Pays for cross-chain execution
-*   **Gateway Call**: Initiates contract call through Axelar network
-*   **Refund Recipient**: Gas refunds directed to `msg.sender`
+*   **Gas Service Payment**: Prepays execution gas via Axelar gas service
+*   **Gateway Routing**: Routes message through Axelar's decentralized gateway
+*   **Refund Management**: Gas refunds processed through Axelar's system
 
 ## Token Requirements​
 
-### ERC20 Approval​
+### ERC20 Transfer Process​
 
-Before calling this function, users must approve the external chain station contract:
-
-```codeBlockLines_e6Vv
-IERC20(token).approve(externalChainStationAddress, amount);
-```
-
-### Allowance Validation​
-
-The function verifies sufficient allowance before attempting transfer:
+The function uses SafeTransferLib for secure and gas-optimized token transfers:
 
 ```codeBlockLines_e6Vv
-if (IERC20(token).allowance(msg.sender, address(this)) < amount)    revert ErrorsLib.InsufficientBalance();
+SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), amount);
 ```
+
+### Prerequisites​
+
+*   **Token Approval**: Users must approve the External Chain Station contract for the deposit amount
+*   **Sufficient Balance**: User must have adequate token balance for the transfer
+*   **Valid Token**: Token contract must be a valid ERC20 implementation
 
 ## Cross-Chain Message Processing​
 
 ### Payload Structure​
 
 ```codeBlockLines_e6Vv
-payload = abi.encode(token, toAddress, amount);
+bytes memory payload = PayloadUtils.encodePayload(token, toAddress, amount);
 ```
 
 ### Host Chain Processing​
 
-Upon message receipt, the host chain station will:
+Upon successful cross-chain message delivery:
 
-1.  Decode the payload to extract `(token, toAddress, amount)`
-2.  Call `Evvm(evvmAddress).addAmountToUser(toAddress, token, amount)`
-3.  Credit the recipient's EVVM balance with the deposited tokens
+1.  **Payload Decoding**: `PayloadUtils.decodePayload()` extracts transfer parameters
+2.  **EVVM Integration**: `Evvm(evvmAddress).addAmountToUser(toAddress, token, amount)`
+3.  **Balance Credit**: Recipient's EVVM balance immediately reflects the deposited tokens
 
 ## Gas Requirements​
 
@@ -12342,17 +12173,17 @@ Use the respective quote functions to estimate required amounts:
 
 ## Security Features​
 
-### Token Validation​
+### Input Validation​
 
-*   **Non-zero Address**: Rejects `address(0)` for token parameter
-*   **Allowance Check**: Verifies sufficient ERC20 allowance before transfer
-*   **Transfer Verification**: Uses `transferFrom` which reverts on failure
+*   **Amount Check**: `ErrorsLib.DepositAmountMustBeGreaterThanZero()` prevents zero deposits
+*   **Safe Transfer**: `SafeTransferLib.safeTransferFrom()` handles transfer edge cases
+*   **Protocol Support**: Validates supported protocol identifiers (0x01, 0x02, 0x03)
 
 ### Cross-Chain Security​
 
-*   **Protocol Authentication**: Each protocol validates message origin and sender
-*   **Payload Integrity**: Encoded data ensures accurate parameter transmission
-*   **Address Binding**: Messages tied to specific recipient addresses
+*   **Message Authentication**: Each protocol validates sender and origin chain
+*   **Payload Integrity**: `PayloadUtils` ensures consistent encoding/decoding
+*   **Recipient Verification**: Direct address binding prevents misdirected funds
 
 ## Error Conditions​
 
@@ -12360,21 +12191,21 @@ Error
 
 Condition
 
-`InsufficientBalance`
+`DepositAmountMustBeGreaterThanZero`
 
-Insufficient ERC20 allowance or native tokens for gas
+Amount parameter is zero
 
-ERC20 Transfer Failure
+SafeTransfer Revert
 
-Token transfer reverts (insufficient balance, paused token, etc.)
+Token transfer fails (insufficient balance, approval, etc.)
 
 Protocol Revert
 
-Unsupported `protocolToExecute` value
+Invalid `protocolToExecute` value
 
-Cross-chain Failure
+Insufficient Gas
 
-Insufficient gas payment for chosen protocol
+`msg.value` doesn't cover cross-chain messaging costs
 
 ## Usage Example​
 
@@ -12398,18 +12229,19 @@ Users must approve the external chain station contract before calling this funct
 *   [Parameters](#parameters)
 *   [Protocol Identifiers](#protocol-identifiers)
 *   [Workflow](#workflow)
-    *   [1\. Payload Encoding](#1-payload-encoding)
-    *   [2\. Token Transfer Verification](#2-token-transfer-verification)
+    *   [1\. Input Validation](#1-input-validation)
+    *   [2\. Token Transfer](#2-token-transfer)
+    *   [3\. Payload Encoding](#3-payload-encoding)
     *   [3\. Protocol-Specific Cross-Chain Execution](#3-protocol-specific-cross-chain-execution)
 *   [Token Requirements](#token-requirements)
-    *   [ERC20 Approval](#erc20-approval)
-    *   [Allowance Validation](#allowance-validation)
+    *   [ERC20 Transfer Process](#erc20-transfer-process)
+    *   [Prerequisites](#prerequisites)
 *   [Cross-Chain Message Processing](#cross-chain-message-processing)
     *   [Payload Structure](#payload-structure)
     *   [Host Chain Processing](#host-chain-processing)
 *   [Gas Requirements](#gas-requirements)
 *   [Security Features](#security-features)
-    *   [Token Validation](#token-validation)
+    *   [Input Validation](#input-validation)
     *   [Cross-Chain Security](#cross-chain-security)
 *   [Error Conditions](#error-conditions)
 *   [Usage Example](#usage-example)
@@ -12422,7 +12254,7 @@ Function Type: external payable
 Function Signature: depositCoin(address,uint256,bytes1)
 Returns: void
 
-Deposits native coins from the external chain to EVVM through cross-chain protocols. This function accepts native currency from the user and sends a cross-chain message to credit the recipient's EVVM balance.
+Deposits native ETH and sends it to host chain via selected cross-chain protocol. The msg.value must cover both the deposit amount and protocol messaging fees.
 
 ## Parameters​
 
@@ -12478,85 +12310,86 @@ Uses Axelar gateway for decentralized cross-chain communication
 
 ## Workflow​
 
-### 1. Balance Verification​
+### 1. Input Validation​
 
 ```codeBlockLines_e6Vv
-if (msg.value < amount) revert ErrorsLib.InsufficientBalance();
+if (amount == 0) revert ErrorsLib.DepositAmountMustBeGreaterThanZero();
 ```
 
-Ensures the user sent at least the deposit amount in native currency.
+Prevents zero-value deposits and ensures meaningful transaction amounts.
 
 ### 2. Payload Encoding​
 
 ```codeBlockLines_e6Vv
-bytes memory payload = encodePayload(address(0), toAddress, amount);
+bytes memory payload = PayloadUtils.encodePayload(address(0), toAddress, amount);
 ```
 
-Encodes the deposit with address(0) representing native coins.
+Creates standardized payload with address(0) representing native ETH using PayloadUtils library.
 
 ### 3. Protocol-Specific Cross-Chain Execution​
 
 #### Hyperlane (0x01)​
 
 ```codeBlockLines_e6Vv
-uint256 quote = getQuoteHyperlane(toAddress, address(0), amount);if (msg.value < quote + amount)    revert ErrorsLib.InsufficientBalance();    IMailbox(hyperlane.mailboxAddress).dispatch{value: quote}(    hyperlane.hostChainStationDomainId,    hyperlane.hostChainStationAddress,    payload);
+uint256 quote = IMailbox(hyperlane.mailboxAddress).quoteDispatch(    hyperlane.hostChainStationDomainId,    hyperlane.hostChainStationAddress,    payload);if (msg.value < (amount + quote))     revert ErrorsLib.InvalidDepositAmount();    IMailbox(hyperlane.mailboxAddress).dispatch{value: quote}(    hyperlane.hostChainStationDomainId,    hyperlane.hostChainStationAddress,    payload);
 ```
 
-*   **Total Requirement**: `msg.value >= amount + gas_quote`
-*   **Amount Allocation**: `amount` for deposit, `quote` for gas
-*   **Gas Payment**: Uses `quote` value for Hyperlane dispatch
+*   **Quote Calculation**: Gets exact dispatch cost from Hyperlane mailbox
+*   **Total Validation**: `msg.value >= amount + quote` ensures sufficient funds
+*   **Fee Payment**: Uses precise quote for gas payment
 
 #### LayerZero (0x02)​
 
 ```codeBlockLines_e6Vv
-uint256 fee = quoteLayerZero(toAddress, address(0), amount);if (msg.value < fee + amount)    revert ErrorsLib.InsufficientBalance();    _lzSend(    layerZero.hostChainStationEid,    payload,    _options,    MessagingFee(fee, 0),    msg.sender);
+MessagingFee memory fee = _quote(    layerZero.hostChainStationEid,    payload,    options,    false);if (msg.value < (amount + fee.nativeFee))     revert ErrorsLib.InvalidDepositAmount();    _lzSend(    layerZero.hostChainStationEid,    payload,    options,    MessagingFee(fee.nativeFee, 0),    msg.sender);
 ```
 
-*   **Total Requirement**: `msg.value >= amount + fee`
-*   **Amount Allocation**: `amount` for deposit, `fee` for LayerZero messaging
-*   **Refund**: Excess fees refunded to `msg.sender`
+*   **Fee Quotation**: Calculates exact LayerZero V2 messaging costs
+*   **Balance Validation**: Ensures sufficient funds for deposit + messaging
+*   **Refund Mechanism**: LayerZero handles excess fee refunds automatically
 
 #### Axelar (0x03)​
 
 ```codeBlockLines_e6Vv
-IAxelarGasService(axelar.gasServiceAddress).payNativeGasForContractCall{    value: msg.value - amount}(    address(this),    axelar.hostChainStationChainName,    axelar.hostChainStationAddress,    payload,    msg.sender);gateway().callContract(    axelar.hostChainStationChainName,    axelar.hostChainStationAddress,    payload);
+if (msg.value <= amount)     revert ErrorsLib.InvalidDepositAmount();    IAxelarGasService(axelar.gasServiceAddress).payNativeGasForContractCall{    value: msg.value - amount}(    address(this),    axelar.hostChainStationChainName,    axelar.hostChainStationAddress,    payload,    msg.sender);gateway().callContract(    axelar.hostChainStationChainName,    axelar.hostChainStationAddress,    payload);
 ```
 
-*   **Gas Allocation**: `msg.value - amount` for gas service
-*   **Amount Isolation**: `amount` reserved for deposit
-*   **Refund Recipient**: Gas refunds directed to `msg.sender`
+*   **Fund Separation**: `msg.value > amount` ensures gas budget available
+*   **Gas Service Payment**: `msg.value - amount` allocated for cross-chain execution
+*   **Gateway Dispatch**: Routes message through Axelar's decentralized network
 
 ## Native Coin Handling​
 
 ### Value Distribution​
 
-The msg.value is split between:
+The msg.value serves dual purposes:
 
-1.  **Deposit Amount**: The actual coins being deposited to EVVM
-2.  **Gas Fees**: Native tokens required for cross-chain messaging
+1.  **Deposit Amount**: Actual ETH being bridged to EVVM ecosystem
+2.  **Protocol Fees**: Gas costs for cross-chain message execution
 
-### Protocol-Specific Requirements​
+### Fee Structure by Protocol​
 
-*   **Hyperlane & LayerZero**: Explicit validation of `msg.value >= amount + gas_cost`
-*   **Axelar**: Gas service receives `msg.value - amount`
+*   **Hyperlane**: `msg.value >= amount + quote` for precise fee calculation
+*   **LayerZero**: `msg.value >= amount + fee.nativeFee` with automatic refunds
+*   **Axelar**: `msg.value > amount` with remainder allocated to gas service
 
 ## Cross-Chain Message Processing​
 
 ### Payload Structure​
 
 ```codeBlockLines_e6Vv
-payload = abi.encode(address(0), toAddress, amount);
+bytes memory payload = PayloadUtils.encodePayload(address(0), toAddress, amount);
 ```
 
-The address(0) indicates native coin transfer.
+Uses standardized PayloadUtils with address(0) representing native ETH.
 
 ### Host Chain Processing​
 
-Upon message receipt, the host chain station will:
+Upon successful cross-chain message delivery:
 
-1.  Decode payload: `(address(0), toAddress, amount)`
-2.  Call `Evvm(evvmAddress).addAmountToUser(toAddress, address(0), amount)`
-3.  Credit recipient's EVVM balance with native coin equivalent
+1.  **Payload Decoding**: `PayloadUtils.decodePayload()` extracts `(address(0), toAddress, amount)`
+2.  **EVVM Integration**: `Evvm(evvmAddress).addAmountToUser(toAddress, address(0), amount)`
+3.  **Balance Update**: Recipient's EVVM balance reflects deposited native coins
 
 ## Gas Estimation​
 
@@ -12584,17 +12417,17 @@ uint256 totalRequired = amount + estimatedAxelarGas;
 
 ## Security Features​
 
-### Value Validation​
+### Input Validation​
 
-*   **Minimum Requirement**: `msg.value >= amount`
-*   **Protocol-Specific**: Additional validation for gas coverage
-*   **Atomic Operations**: Deposit and gas payment processed together
+*   **Amount Check**: `ErrorsLib.DepositAmountMustBeGreaterThanZero()` prevents zero deposits
+*   **Balance Validation**: Protocol-specific checks ensure sufficient `msg.value`
+*   **Atomic Processing**: Deposit and cross-chain messaging happen atomically
 
 ### Cross-Chain Security​
 
-*   **Protocol Authentication**: Message origin and sender validation
-*   **Native Coin Representation**: `address(0)` convention for native assets
-*   **Balance Integrity**: Exact `amount` credited to EVVM balance
+*   **Message Authentication**: Each protocol validates sender authorization
+*   **Payload Integrity**: `PayloadUtils` ensures consistent data encoding
+*   **Native Asset Handling**: Standardized `address(0)` convention across protocols
 
 ## Error Conditions​
 
@@ -12602,17 +12435,21 @@ Error
 
 Condition
 
-`InsufficientBalance`
+`DepositAmountMustBeGreaterThanZero`
 
-`msg.value < amount` or insufficient gas coverage
+Amount parameter is zero
+
+`InvalidDepositAmount`
+
+Insufficient `msg.value` for deposit + protocol fees
 
 Protocol Revert
 
-Unsupported `protocolToExecute` value
+Unsupported `protocolToExecute` identifier
 
-Cross-chain Failure
+Cross-Chain Failure
 
-Insufficient gas payment for chosen protocol
+Insufficient gas payment for selected protocol
 
 ## Usage Examples​
 
@@ -12649,12 +12486,12 @@ Native coins are represented as address(0) in EVVM balances, consistent with the
 *   [Parameters](#parameters)
 *   [Protocol Identifiers](#protocol-identifiers)
 *   [Workflow](#workflow)
-    *   [1\. Balance Verification](#1-balance-verification)
+    *   [1\. Input Validation](#1-input-validation)
     *   [2\. Payload Encoding](#2-payload-encoding)
     *   [3\. Protocol-Specific Cross-Chain Execution](#3-protocol-specific-cross-chain-execution)
 *   [Native Coin Handling](#native-coin-handling)
     *   [Value Distribution](#value-distribution)
-    *   [Protocol-Specific Requirements](#protocol-specific-requirements)
+    *   [Fee Structure by Protocol](#fee-structure-by-protocol)
 *   [Cross-Chain Message Processing](#cross-chain-message-processing)
     *   [Payload Structure](#payload-structure)
     *   [Host Chain Processing](#host-chain-processing)
@@ -12663,7 +12500,7 @@ Native coins are represented as address(0) in EVVM balances, consistent with the
     *   [LayerZero](#layerzero)
     *   [Axelar](#axelar)
 *   [Security Features](#security-features)
-    *   [Value Validation](#value-validation)
+    *   [Input Validation](#input-validation)
     *   [Cross-Chain Security](#cross-chain-security)
 *   [Error Conditions](#error-conditions)
 *   [Usage Examples](#usage-examples)
@@ -12680,7 +12517,7 @@ Function Signature: fisherBridgeReceive(address,address,address,uint256,uint256,
 Access Control: onlyFisherExecutor
 Returns: void
 
-Processes incoming cross-chain withdrawal requests mediated by authorized fisher executors. This function validates cryptographic signatures from users and manages nonce tracking for the fisher bridge system on the external chain.
+Receives and validates Fisher bridge transactions from host chain. Verifies EIP-191 signature and increments nonce but doesn't transfer tokens (validation-only function for external chain).
 
 ## Parameters​
 
@@ -12739,27 +12576,29 @@ Only addresses with the current fisherExecutor role can call this function.
 ### 1. Signature Verification​
 
 ```codeBlockLines_e6Vv
-if (!SignatureUtils.verifyMessageSignedForFisherBridge(    from,    addressToReceive,    nextFisherExecutionNonce[from],    tokenAddress,    priorityFee,    amount,    signature)) revert ErrorsLib.InvalidSignature();
+if (!SignatureUtils.verifyMessageSignedForFisherBridge(    EVVM_ID,    from,    addressToReceive,    nextFisherExecutionNonce[from],    tokenAddress,    priorityFee,    amount,    signature)) revert ErrorsLib.InvalidSignature();
 ```
 
-Validates the signature using the Fisher Bridge signature format. For complete signature requirements and verification process, see the Fisher Bridge Signature Structure documentation.
+Validates EIP-191 signature with EVVM ID integration using structured message format: "{EVVM_ID},fisherBridge,{addressToReceive},{nonce},{tokenAddress},{priorityFee},{amount}".
 
-### 2. Nonce Management​
+### 2. Nonce Increment​
 
 ```codeBlockLines_e6Vv
 nextFisherExecutionNonce[from]++;
 ```
 
-Increments the user's execution nonce to prevent signature replay attacks.
+Increments Fisher bridge nonce to prevent replay attacks across cross-chain operations.
 
-## External Chain Processing​
+## Validation-Only Function​
 
-Unlike the host chain station, this function only validates signatures and manages nonces. The actual token transfers on the external chain must be handled by external processes that:
+This function serves as a validation endpoint and does not perform token transfers. Its purpose:
 
-1.  **Monitor Events**: Listen for `FisherBridgeSend` events from the host chain station
-2.  **Validate Signatures**: Use this function to verify user authorization
-3.  **Execute Transfers**: Perform the actual token transfers on the external chain
-4.  **Coordinate Fees**: Handle priority fee distribution to fisher executors
+1.  **Signature Validation**: Cryptographically verifies user authorization for Fisher bridge operations
+2.  **Nonce Management**: Tracks sequential nonces to prevent replay attacks
+3.  **Access Control**: Ensures only authorized Fisher executors can validate transactions
+4.  **Cross-Chain Coordination**: Provides secure validation for off-chain Fisher bridge processes
+
+Note: Actual token transfers on the external chain must be handled by separate Fisher bridge mechanisms that coordinate with this validation system.
 
 ## Signature Message Format​
 
@@ -12875,8 +12714,8 @@ Nonce values must remain synchronized between host and external chain stations. 
 *   [Access Control](#access-control)
 *   [Workflow](#workflow)
     *   [1\. Signature Verification](#1-signature-verification)
-    *   [2\. Nonce Management](#2-nonce-management)
-*   [External Chain Processing](#external-chain-processing)
+    *   [2\. Nonce Increment](#2-nonce-increment)
+*   [Validation-Only Function](#validation-only-function)
 *   [Signature Message Format](#signature-message-format)
 *   [Fisher Bridge Architecture](#fisher-bridge-architecture)
     *   [Cross-Chain Coordination](#cross-chain-coordination)
@@ -12903,7 +12742,7 @@ Function Signature: fisherBridgeSendERC20(address,address,address,uint256,uint25
 Access Control: onlyFisherExecutor
 Returns: void
 
-Facilitates ERC20 token deposits from external chain to EVVM through the fisher bridge system. This function validates user signatures, transfers tokens from users to the contract, and emits events for cross-chain processing coordination.
+Processes Fisher bridge ERC20 token transfers to host chain. Validates signature, deposits tokens, and emits tracking event for cross-chain coordination.
 
 ## Parameters​
 
@@ -12962,32 +12801,26 @@ Only addresses with the current fisherExecutor role can call this function.
 ### 1. Signature Verification​
 
 ```codeBlockLines_e6Vv
-if (!SignatureUtils.verifyMessageSignedForFisherBridge(    from,    addressToReceive,    nextFisherExecutionNonce[from],    tokenAddress,    priorityFee,    amount,    signature)) revert ErrorsLib.InvalidSignature();
+if (!SignatureUtils.verifyMessageSignedForFisherBridge(    EVVM_ID,    from,    addressToReceive,    nextFisherExecutionNonce[from],    tokenAddress,    priorityFee,    amount,    signature)) revert ErrorsLib.InvalidSignature();
 ```
 
-Validates the signature using the Fisher Bridge signature format. For complete signature requirements and verification process, see the Fisher Bridge Signature Structure documentation.
+Validates EIP-191 signature with EVVM ID integration using structured message format for Fisher bridge operations.
 
-For more information about the signature structure, refer to the Fisher Bridge Signature Structure.
-
-### 2. Token Transfer Verification​
+### 2. Token Transfer​
 
 ```codeBlockLines_e6Vv
-verifyAndDepositERC20(tokenAddress, amount);
+SafeTransferLib.safeTransferFrom(tokenAddress, from, address(this), amount + priorityFee);
 ```
 
-Internal function that performs:
+Safely transfers ERC20 tokens from user to contract using Solady's SafeTransferLib. Total transfer includes both deposit amount and priority fee.
 
-*   **Address Validation**: Ensures `tokenAddress != address(0)`
-*   **Allowance Check**: Verifies `IERC20(tokenAddress).allowance(msg.sender, address(this)) >= amount`
-*   **Token Transfer**: Executes `IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount)`
-
-### 3. Nonce Management​
+### 3. Nonce Increment​
 
 ```codeBlockLines_e6Vv
 nextFisherExecutionNonce[from]++;
 ```
 
-Increments the user's execution nonce to prevent replay attacks.
+Increments Fisher bridge nonce to prevent replay attacks.
 
 ### 4. Event Emission​
 
@@ -13133,8 +12966,8 @@ This function initiates the deposit process but requires off-chain services to c
 *   [Access Control](#access-control)
 *   [Workflow](#workflow)
     *   [1\. Signature Verification](#1-signature-verification)
-    *   [2\. Token Transfer Verification](#2-token-transfer-verification)
-    *   [3\. Nonce Management](#3-nonce-management)
+    *   [2\. Token Transfer](#2-token-transfer)
+    *   [3\. Nonce Increment](#3-nonce-increment)
     *   [4\. Event Emission](#4-event-emission)
 *   [Token Requirements](#token-requirements)
     *   [ERC20 Approval](#erc20-approval)

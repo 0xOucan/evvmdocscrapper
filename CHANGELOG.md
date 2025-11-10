@@ -1,5 +1,46 @@
 # Changelog
 
+## [2.1.0] - Documentation Expansion Update
+
+### 📊 Latest Scrape Information
+
+**Scrape Timestamp**: `2025-11-10T17:32:53.335Z`
+
+### 🎯 Changes
+
+#### Documentation Growth
+- **Page Count**: Increased from 135 to 149 EVVM documentation pages (+14 pages)
+- **Total Pages**: 150 pages (149 EVVM + 1 EIP-191)
+- **Pages Hash**: `ea6c7b391bb1fbb2`
+
+#### Updated Files
+1. **README.md**
+   - Updated page count references from 135 to 149
+   - Updated total pages from 136 to 150
+   - Updated example output with latest scrape timestamp
+
+2. **dist/llms-full.txt**
+   - Refreshed with latest EVVM documentation
+   - Metadata reflects new page count and timestamp
+   - Maintained EIP-191 strategic placement
+
+### 📝 What's New
+
+The EVVM documentation website has expanded significantly:
+- 14 new documentation pages added
+- All existing pages updated to latest content
+- EIP-191 integration maintained
+- Change detection working correctly
+
+### 🔄 No Breaking Changes
+
+- All functionality remains the same
+- File structure unchanged
+- Output format consistent
+- EIP-191 automatically included as before
+
+---
+
 ## [2.0.0] - EIP-191 Auto-Integration Update
 
 ### 🎯 Major Changes
@@ -180,7 +221,7 @@ EIP-191 (Signed Data Standard) is **essential** for understanding EVVM because:
 - Placing it 18,000+ lines away made it hard for LLMs to connect the concepts
 - Now it's only 183 lines away - much better for LLM context windows
 
-### 📊 Statistics
+### 📊 Statistics (v2.0.0 Initial Release)
 
 - **EVVM Pages Scraped**: 135
 - **Additional Pages**: 1 (EIP-191)

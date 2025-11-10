@@ -52,9 +52,9 @@ Minimal index file with:
 - EIP-191 reference
 - Link to full documentation
 
-### `llms-full.txt` (753KB, 19,114 lines, 136 pages)
+### `llms-full.txt` (753KB, 19,114 lines, 150 pages)
 Complete documentation with:
-- 135 EVVM documentation pages
+- 149 EVVM documentation pages
 - EIP-191 standard (strategically placed after transaction docs)
 - All content in clean Markdown format
 
@@ -108,8 +108,8 @@ The scraper automatically detects website changes before scraping:
 Example output when no changes:
 ```
 🔍 Checking for website changes...
-📊 Previous scrape: 2025-11-05T00:36:13.467Z
-📄 Previous page count: 135
+📊 Previous scrape: 2025-11-10T17:32:53.335Z
+📄 Previous page count: 149
 ✅ No changes detected!
 💡 Use npm run scrape -- --force to scrape anyway
 ```
